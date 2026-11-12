@@ -1,0 +1,2 @@
+blk_mem_woods.v,verilog,xil_defaultlib,../../../../battle_city_fpga.gen/sources_1/ip/blk_mem_woods/sim/blk_mem_woods.v,
+glbl.v,Verilog,xil_defaultlib,glbl.v
