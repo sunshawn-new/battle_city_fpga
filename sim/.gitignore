@@ -1,0 +1,26 @@
+# xsim 产生的中间文件
+xsim.dir/
+xsim*.backup*
+webtalk*.jou
+webtalk*.log
+*.jou
+*.log
+*.pb
+.pid
+pid.txt
+
+# 生成的 / 临时的仿真与报告文件
+map_mem.hex
+sim_latency_*.log
+timing_report.txt
+clocks_probe.txt
+probe_out.log
+probe_err.log
+probe2_out.log
+probe2_err.log
+vivado_timing_stdout.log
+vivado_timing_stderr.log
+
+# build_all.tcl 产出的日志与报告
+build_report.txt
+*.err

@@ -7,6 +7,8 @@ module vga(
     input [9:0] position_y,
     input wire [3:0] tile_id,
     input wire [1:0] player_direction,
+    input wire [3:0] terrain_in_front,  // 前方地形查询结果（仅用于左上角调试色块）
+    input wire       terrain_valid,     // 前方地形查询是否有效（仅用于调试色块）
     output wire vga_clk,
     output [11:0] disp_RGB,
     output wire hsync,
@@ -136,6 +138,26 @@ module vga(
         endcase
     end
 
+    // ---------------- 左上角调试色块 ----------------
+    // 把“前方地形查询”的状态直接画在画面上，方便不接逻辑分析仪也能看出问题：
+    //   红 = 结果无效 / 正在扫描（这一拍坦克一定不动）
+    //   绿 = 前方可通行（空地或树林）
+    //   黄 = 前方被挡住（砖/钢/河流/基地）
+    // 不想要就把它改成 1'b0。
+    localparam DBG_OVERLAY = 1'b1;
+    wire dbg_box = DBG_OVERLAY && (img_x >= 11'd4) && (img_x < 11'd16) &&
+                                  (img_y >= 11'd4) && (img_y < 11'd16);
+
+    reg [11:0] dbg_color;
+    always @(*) begin
+        if (!terrain_valid)
+            dbg_color = 12'hF00;                                   // 红
+        else if (terrain_in_front == 4'd0 || terrain_in_front == 4'd4)
+            dbg_color = 12'h0F0;                                   // 绿
+        else
+            dbg_color = 12'hFF0;                                   // 黄
+    end
+
     // 5. 叠加图层逻辑 (坦克与草地遮挡)
     // 需要增加根据坦克朝向绘制的逻辑
     wire tank_valid = (img_x >= position_x) && (img_x <= position_x + 19) &&
@@ -147,7 +169,9 @@ module vga(
 
     reg [11:0] final_color;
     always @(*) begin
-        if (tile_id == 4'd4 && woods_pixel[15]) begin
+        if (dbg_box) begin
+            final_color = dbg_color;   // 调试色块优先级最高
+        end else if (tile_id == 4'd4 && woods_pixel[15]) begin
             final_color = bg_color; // 树林层级最高，覆盖坦克，但是取决于该方格是否透明
         end else if (tank_valid_d1) begin
             final_color = player_pixel[11:0];

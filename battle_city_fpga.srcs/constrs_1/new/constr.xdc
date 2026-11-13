@@ -38,3 +38,25 @@ set_property IOSTANDARD LVCMOS33 [get_ports clock]
 set_property IOSTANDARD LVCMOS33 [get_ports hsync]
 set_property IOSTANDARD LVCMOS33 [get_ports reset]
 set_property IOSTANDARD LVCMOS33 [get_ports vsync]
+
+# ============================================================================
+# 时序约束
+# ----------------------------------------------------------------------------
+# 这两个约束原来缺失，导致整份设计（126 个触发器）全部处于“无时钟”状态：
+#   check_timing 曾经报 no_clock(144) / unconstrained_internal_endpoints(474)
+# 没有时钟约束 ⇒ Vivado 完全不做时序分析，也不为时序做任何优化/布线努力，
+# 前方地形查询那种“除法 + 比较 + 16 位加法 → BRAM 地址”的长组合路径就可能
+# 在 100MHz 下跑不动，抓到错的地图格子（表现为四方向全被“空气墙”挡住）。
+# ============================================================================
+
+# 板上 100MHz 晶振（W5）
+create_clock -period 10.000 -name sys_clk_pin [get_ports clock]
+
+# VGA 像素时钟：clk_50m_reg 是 100MHz 二分频得到，属于同步派生时钟。
+# 注意 1：不能写 [get_pins u_vga/clk_50m_reg/Q] —— 综合后这个寄存器会被改名成
+#         clk_50m_reg_reg，写死引脚名会约束失败。
+# 注意 2：XDC 文件里不能用 if / foreach 之类的 Tcl 控制流（Vivado 会报
+#         "Command 'if' is not supported in the xdc constraint file" 并跳过），
+#         所以这里直接写约束命令，目标用 RTL 里稳定的网名 vga_clk。
+create_generated_clock -name vga_clk -source [get_ports clock] \
+                       -divide_by 2 [get_nets vga_clk]
