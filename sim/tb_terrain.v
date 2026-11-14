@@ -11,8 +11,9 @@
 //   树林 : 行 20~39 ，列 120~149
 //   基地 : 行 108~118，列 72~87（内部行 112~117 / 列 76~83 是基地本体）
 //
-// 仿真用 MOVE_DIV=200 代替板上的 400000（每 200 个时钟走 1 像素），
-// 地形扫描约 22 拍，200 拍足够它完成，所以“每个节拍正好走 1 像素”。
+// 仿真用 MOVE_DIV=200 代替板上的 4_000_000。坦克现在是【整格移动】：
+// 每个 move_tick 走一整格 TILE=5 像素（见 player.v 的说明），地形扫描约 22 拍，
+// 200 拍足够它完成。所以下面的 step_ticks(n) 表示“走 n 像素”，内部换算成 n/5 格。
 // ============================================================================
 module tb_terrain;
     localparam MOVE_DIV = 200;
@@ -20,6 +21,7 @@ module tb_terrain;
     reg clock = 1'b0;
     reg reset = 1'b1;
     reg btn_up = 1'b0, btn_down = 1'b0, btn_left = 1'b0, btn_right = 1'b0;
+    reg btn_fire = 1'b0;    // 本测试台不开火（炮弹逻辑由 tb_bullet 覆盖）
 
     wire [11:0] disp_RGB;
     wire hsync, vsync;
@@ -30,6 +32,7 @@ module tb_terrain;
         .clock(clock), .reset(reset),
         .btn_up(btn_up), .btn_down(btn_down),
         .btn_left(btn_left), .btn_right(btn_right),
+        .btn_fire(btn_fire),
         .disp_RGB(disp_RGB), .hsync(hsync), .vsync(vsync)
     );
 
@@ -39,13 +42,14 @@ module tb_terrain;
     integer errors = 0;
     integer k, j;
 
-    // 等待 n 次移动节拍（每次走 1 像素）
+    // 等待走过 n 个像素（n 必须是 5 的倍数）。
+    // 坦克是整格移动的，所以内部换算成 n/5 次移动节拍，每次走 TILE 像素。
     // move_tick 在 cnt==MOVE_DIV-1 那一拍拉高，位置的更新发生在其后的下一个
     // 时钟沿，所以要多等一拍再 #1 才能看到新位置。
     task step_ticks;
         input integer n;
         begin
-            for (k = 0; k < n; k = k + 1) begin
+            for (k = 0; k < (n / 5); k = k + 1) begin
                 @(posedge u_top.u_player.move_tick);
                 @(posedge clock);
                 #1;
@@ -110,6 +114,20 @@ module tb_terrain;
         end
     endtask
 
+
+    task check_grid;
+        input [8*44-1:0] name;
+        input [9:0] gx;
+        input [9:0] gy;
+        begin
+            if (((gx % 5) !== 0) || ((gy % 5) !== 0)) begin
+                errors = errors + 1;
+                $display("[FAIL] %0s : (%0d,%0d) is not on the 5px grid", name, gx, gy);
+            end else begin
+                $display("[ OK ] %0s : (%0d,%0d)", name, gx, gy);
+            end
+        end
+    endtask
 
     initial begin
         $display("=========== terrain collision test ===========");
@@ -194,6 +212,22 @@ module tb_terrain;
         do_reset; place_tank(10'd400, 10'd480);
         btn_down = 1'b1;  step_ticks(50); btn_down = 1'b0;
         check_pos("T13 down blocked by base brick", 10'd400, 10'd520);
+
+        // ---- T14 格点不变量：坐标必须永远是 TILE(5) 的倍数 ----
+        // 这是炮弹系统（bullet-ctrl.v）按格判定的前提：坦克一旦停在非格点上，
+        // 炮口就不再落在格边界，10x10 的弹体就会跨 3 格，打出的洞也会偏心。
+        do_reset;                                   // (400,300)
+        btn_up = 1'b1;    step_ticks(10); btn_up = 1'b0;
+        check_grid("T14a after up   on 5px grid", px, py);
+
+        btn_right = 1'b1; step_ticks(10); btn_right = 1'b0;
+        check_grid("T14b after right on 5px grid", px, py);
+
+        btn_down = 1'b1;  step_ticks(10); btn_down = 1'b0;
+        check_grid("T14c after down  on 5px grid", px, py);
+
+        btn_left = 1'b1;  step_ticks(10); btn_left = 1'b0;
+        check_grid("T14d after left  on 5px grid", px, py);
 
         $display("==============================================");
         if (errors == 0) $display("ALL TESTS PASSED");

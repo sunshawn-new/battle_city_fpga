@@ -143,6 +143,8 @@ OPTRACE "add files" START { }
   read_ip -quiet E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.srcs/sources_1/ip/blk_mem_steel/blk_mem_steel.xci
   read_ip -quiet E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.srcs/sources_1/ip/blk_mem_river/blk_mem_river.xci
   read_ip -quiet E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.srcs/sources_1/ip/blk_mem_brick/blk_mem_brick.xci
+  add_files -quiet E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.runs/blk_mem_bullet_synth_1/blk_mem_bullet.dcp
+  add_files -quiet E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.runs/blk_mem_headquarters_synth_1/blk_mem_headquarters.dcp
 OPTRACE "read constraints: implementation" START { }
   read_xdc E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.srcs/constrs_1/new/constr.xdc
 OPTRACE "read constraints: implementation" END { }

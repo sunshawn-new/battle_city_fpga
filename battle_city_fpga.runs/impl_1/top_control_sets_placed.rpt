@@ -1,7 +1,7 @@
 Copyright 1986-2021 Xilinx, Inc. All Rights Reserved.
 ------------------------------------------------------------------------------------
 | Tool Version : Vivado v.2021.1 (win64) Build 3247384 Thu Jun 10 19:36:33 MDT 2021
-| Date         : Fri Nov 13 13:11:55 2026
+| Date         : Fri Nov 13 20:14:48 2026
 | Host         : LAPTOP-8QJD8CCP running 64-bit major release  (build 9200)
 | Command      : report_control_sets -verbose -file top_control_sets_placed.rpt
 | Design       : top
@@ -23,11 +23,11 @@ Table of Contents
 +----------------------------------------------------------+-------+
 |                          Status                          | Count |
 +----------------------------------------------------------+-------+
-| Total control sets                                       |    11 |
-|    Minimum number of control sets                        |    11 |
+| Total control sets                                       |    52 |
+|    Minimum number of control sets                        |    52 |
 |    Addition due to synthesis replication                 |     0 |
 |    Addition due to physical synthesis replication        |     0 |
-| Unused register locations in slices containing registers |    30 |
+| Unused register locations in slices containing registers |   118 |
 +----------------------------------------------------------+-------+
 * Control sets can be merged at opt_design using control_set_merge or merge_equivalent_drivers
 ** Run report_qor_suggestions for automated merging and remapping suggestions
@@ -39,15 +39,15 @@ Table of Contents
 +--------------------+-------+
 |       Fanout       | Count |
 +--------------------+-------+
-| Total control sets |    11 |
+| Total control sets |    52 |
 | >= 0 to < 4        |     0 |
-| >= 4 to < 6        |     0 |
-| >= 6 to < 8        |     2 |
-| >= 8 to < 10       |     0 |
-| >= 10 to < 12      |     4 |
+| >= 4 to < 6        |     2 |
+| >= 6 to < 8        |     5 |
+| >= 8 to < 10       |     5 |
+| >= 10 to < 12      |    12 |
 | >= 12 to < 14      |     0 |
-| >= 14 to < 16      |     1 |
-| >= 16              |     4 |
+| >= 14 to < 16      |     6 |
+| >= 16              |    22 |
 +--------------------+-------+
 * Control sets can be remapped at either synth_design or opt_design
 
@@ -58,32 +58,73 @@ Table of Contents
 +--------------+-----------------------+------------------------+-----------------+--------------+
 | Clock Enable | Synchronous Set/Reset | Asynchronous Set/Reset | Total Registers | Total Slices |
 +--------------+-----------------------+------------------------+-----------------+--------------+
-| No           | No                    | No                     |              41 |           23 |
+| No           | No                    | No                     |              40 |           21 |
 | No           | No                    | Yes                    |               0 |            0 |
-| No           | Yes                   | No                     |              30 |            8 |
-| Yes          | No                    | No                     |              11 |            3 |
+| No           | Yes                   | No                     |             246 |           80 |
+| Yes          | No                    | No                     |              15 |            5 |
 | Yes          | No                    | Yes                    |               0 |            0 |
-| Yes          | Yes                   | No                     |              96 |           41 |
+| Yes          | Yes                   | No                     |             589 |          221 |
 +--------------+-----------------------+------------------------+-----------------+--------------+
 
 
 4. Detailed Control Set Information
 -----------------------------------
 
-+------------------+--------------------------------+-------------------------+------------------+----------------+--------------+
-|   Clock Signal   |          Enable Signal         |     Set/Reset Signal    | Slice Load Count | Bel Load Count | Bels / Slice |
-+------------------+--------------------------------+-------------------------+------------------+----------------+--------------+
-|  clock_IBUF_BUFG |                                | reset_IBUF              |                2 |              6 |         3.00 |
-|  clock_IBUF_BUFG | u_player/E[0]                  | reset_IBUF              |                4 |              7 |         1.75 |
-|  clock_IBUF_BUFG |                                |                         |                6 |             10 |         1.67 |
-|  clock_IBUF_BUFG | u_player/position_x[9]_i_1_n_0 | reset_IBUF              |                4 |             10 |         2.50 |
-|  clock_IBUF_BUFG | u_player/position_y[9]_i_1_n_0 | reset_IBUF              |                4 |             10 |         2.50 |
-|  vga_clk_BUFG    | u_vga/vcount                   |                         |                3 |             11 |         3.67 |
-|  clock_IBUF_BUFG | scan_addr_r[14]_i_1_n_0        | reset_IBUF              |                6 |             15 |         2.50 |
-|  clock_IBUF_BUFG | u_player/CEA2                  | reset_IBUF              |               10 |             22 |         2.20 |
-|  clock_IBUF_BUFG |                                | u_player/cnt[0]_i_1_n_0 |                6 |             24 |         4.00 |
-|  vga_clk_BUFG    |                                |                         |               17 |             31 |         1.82 |
-|  clock_IBUF_BUFG | g_ty_last_reg_i_1_n_0          | reset_IBUF              |               13 |             32 |         2.46 |
-+------------------+--------------------------------+-------------------------+------------------+----------------+--------------+
++------------------+-----------------------------------------------------+---------------------------------------------+------------------+----------------+--------------+
+|   Clock Signal   |                    Enable Signal                    |               Set/Reset Signal              | Slice Load Count | Bel Load Count | Bels / Slice |
++------------------+-----------------------------------------------------+---------------------------------------------+------------------+----------------+--------------+
+|  clock_IBUF_BUFG | u_bullet_ctrl/chk_state[3]_i_1_n_0                  | reset_IBUF                                  |                2 |              4 |         2.00 |
+|  clock_IBUF_BUFG | u_map_bus/owner[7]_i_1_n_0                          |                                             |                2 |              4 |         2.00 |
+|  clock_IBUF_BUFG |                                                     |                                             |                4 |              6 |         1.50 |
+|  clock_IBUF_BUFG | u_probe/scan_cell[2]_i_1__2_n_0                     | reset_IBUF                                  |                2 |              6 |         3.00 |
+|  clock_IBUF_BUFG | g_enemy_probe[1].u_probe/scan_cell[2]_i_1__0_n_0    | reset_IBUF                                  |                2 |              6 |         3.00 |
+|  clock_IBUF_BUFG | g_enemy_probe[2].u_probe/scan_cell[2]_i_1__1_n_0    | reset_IBUF                                  |                2 |              6 |         3.00 |
+|  clock_IBUF_BUFG | g_enemy_probe[0].u_probe/scan_cell[2]_i_1_n_0       | reset_IBUF                                  |                2 |              6 |         3.00 |
+|  clock_IBUF_BUFG | u_enemy_ctrl/enemy_move_tick[2]                     | u_enemy_ctrl/g_enemy[2].turn_cnt[7]_i_1_n_0 |                3 |              8 |         2.67 |
+|  clock_IBUF_BUFG | u_enemy_ctrl/enemy_move_tick[1]                     | u_enemy_ctrl/g_enemy[1].turn_cnt[7]_i_1_n_0 |                2 |              8 |         4.00 |
+|  clock_IBUF_BUFG | u_enemy_ctrl/enemy_move_tick[0]                     | u_enemy_ctrl/g_enemy[0].turn_cnt[7]_i_1_n_0 |                3 |              8 |         2.67 |
+|  clock_IBUF_BUFG | u_bullet_ctrl/kill_slot[7]_i_1_n_0                  | reset_IBUF                                  |                3 |              8 |         2.67 |
+|  clock_IBUF_BUFG | u_bullet_ctrl/chk_idx                               | reset_IBUF                                  |                3 |              8 |         2.67 |
+|  clock_IBUF_BUFG | u_enemy_ctrl/g_enemy[0].y                           | reset_IBUF                                  |                4 |             10 |         2.50 |
+|  clock_IBUF_BUFG | u_enemy_ctrl/g_enemy[1].x                           | reset_IBUF                                  |                3 |             10 |         3.33 |
+|  clock_IBUF_BUFG | u_enemy_ctrl/g_enemy[2].y                           | reset_IBUF                                  |                7 |             10 |         1.43 |
+|  clock_IBUF_BUFG | u_player/position_x[9]_i_1_n_0                      | reset_IBUF                                  |                4 |             10 |         2.50 |
+|  clock_IBUF_BUFG | u_player/position_y[9]_i_1_n_0                      | reset_IBUF                                  |                4 |             10 |         2.50 |
+|  clock_IBUF_BUFG | g_enemy_probe[0].u_probe/E[0]                       | reset_IBUF                                  |                4 |             10 |         2.50 |
+|  clock_IBUF_BUFG | u_bullet_ctrl/x[0][9]_i_1_n_0                       | reset_IBUF                                  |                5 |             10 |         2.00 |
+|  clock_IBUF_BUFG | u_bullet_ctrl/y[0][9]_i_1_n_0                       | reset_IBUF                                  |                4 |             10 |         2.50 |
+|  clock_IBUF_BUFG | g_enemy_probe[2].u_probe/E[0]                       | reset_IBUF                                  |                4 |             10 |         2.50 |
+|  clock_IBUF_BUFG | u_enemy_ctrl/g_enemy[1].y                           | reset_IBUF                                  |                6 |             10 |         1.67 |
+|  clock_IBUF_BUFG | u_bullet_ctrl/cool_cnt[25]_i_2_n_0                  | u_bullet_ctrl/cool_cnt[25]_i_1_n_0          |                6 |             11 |         1.83 |
+|  vga_clk_BUFG    | u_vga/vcount                                        |                                             |                3 |             11 |         3.67 |
+|  clock_IBUF_BUFG | g_enemy_probe[0].u_probe/scan_addr_r[14]_i_1_n_0    | reset_IBUF                                  |                5 |             15 |         3.00 |
+|  clock_IBUF_BUFG | g_enemy_probe[1].u_probe/scan_addr_r[14]_i_1__0_n_0 | reset_IBUF                                  |                4 |             15 |         3.75 |
+|  clock_IBUF_BUFG | g_enemy_probe[2].u_probe/scan_addr_r[14]_i_1__1_n_0 | reset_IBUF                                  |                6 |             15 |         2.50 |
+|  clock_IBUF_BUFG | u_bullet_ctrl/cool_cnt[24]_i_1_n_0                  | reset_IBUF                                  |                5 |             15 |         3.00 |
+|  clock_IBUF_BUFG | u_probe/scan_addr_r[14]_i_1__2_n_0                  | reset_IBUF                                  |                5 |             15 |         3.00 |
+|  clock_IBUF_BUFG | u_bullet_ctrl/map_addr[14]_i_1_n_0                  | reset_IBUF                                  |                7 |             15 |         2.14 |
+|  clock_IBUF_BUFG |                                                     | u_enemy_ctrl/g_enemy[2].cnt[23]_i_1_n_0     |                7 |             16 |         2.29 |
+|  clock_IBUF_BUFG |                                                     | u_enemy_ctrl/g_enemy[1].cnt[23]_i_1_n_0     |                6 |             16 |         2.67 |
+|  clock_IBUF_BUFG | u_bullet_ctrl/last_cell                             | u_bullet_ctrl/cool_cnt[25]_i_1_n_0          |                5 |             16 |         3.20 |
+|  clock_IBUF_BUFG | u_bullet_ctrl/last_cell[2][15]_i_1_n_0              | reset_IBUF                                  |                4 |             16 |         4.00 |
+|  clock_IBUF_BUFG | u_bullet_ctrl/last_cell[1][15]_i_1_n_0              | reset_IBUF                                  |                4 |             16 |         4.00 |
+|  clock_IBUF_BUFG | u_bullet_ctrl/last_cell[3][15]_i_1_n_0              | reset_IBUF                                  |                4 |             16 |         4.00 |
+|  clock_IBUF_BUFG | u_bullet_ctrl/chop_base[14]_i_1_n_0                 | reset_IBUF                                  |               10 |             16 |         1.60 |
+|  clock_IBUF_BUFG |                                                     | u_bullet_ctrl/db_cnt[19]_i_1_n_0            |                7 |             20 |         2.86 |
+|  clock_IBUF_BUFG | g_enemy_probe[0].u_probe/snap_y[9]_i_1_n_0          | reset_IBUF                                  |                6 |             22 |         3.67 |
+|  clock_IBUF_BUFG | u_probe/snap_y[9]_i_1__2_n_0                        | reset_IBUF                                  |                7 |             22 |         3.14 |
+|  clock_IBUF_BUFG | g_enemy_probe[1].u_probe/snap_y[9]_i_1__0_n_0       | reset_IBUF                                  |                7 |             22 |         3.14 |
+|  clock_IBUF_BUFG | g_enemy_probe[2].u_probe/snap_y[9]_i_1__1_n_0       | reset_IBUF                                  |                7 |             22 |         3.14 |
+|  clock_IBUF_BUFG |                                                     | u_player/cnt[0]_i_1_n_0                     |                6 |             24 |         4.00 |
+|  clock_IBUF_BUFG |                                                     | u_bullet_ctrl/spd_cnt[0]_i_1_n_0            |                6 |             24 |         4.00 |
+|  clock_IBUF_BUFG |                                                     | u_enemy_ctrl/g_enemy[0].cnt[0]_i_1_n_0      |                6 |             24 |         4.00 |
+|  clock_IBUF_BUFG | u_bullet_ctrl/mark_idx[7]_i_1_n_0                   | reset_IBUF                                  |                5 |             24 |         4.80 |
+|  clock_IBUF_BUFG | g_enemy_probe[0].u_probe/g_ty_last_reg_i_1__0_n_0   | reset_IBUF                                  |               15 |             32 |         2.13 |
+|  clock_IBUF_BUFG | g_enemy_probe[1].u_probe/CEP                        | reset_IBUF                                  |               15 |             32 |         2.13 |
+|  clock_IBUF_BUFG | g_enemy_probe[2].u_probe/g_ty_last_reg_i_1__1_n_0   | reset_IBUF                                  |               12 |             32 |         2.67 |
+|  clock_IBUF_BUFG | u_map_bus/scan_state_reg[0]                         | reset_IBUF                                  |               13 |             32 |         2.46 |
+|  vga_clk_BUFG    |                                                     |                                             |               17 |             34 |         2.00 |
+|  clock_IBUF_BUFG |                                                     | reset_IBUF                                  |               42 |            122 |         2.90 |
++------------------+-----------------------------------------------------+---------------------------------------------+------------------+----------------+--------------+
 
 

@@ -13,6 +13,54 @@ set out  "$root/sim/build_report.txt"
 
 open_project "$root/battle_city_fpga.xpr"
 
+# ---- 贴图颜色是 IP 的 .coe 决定的：先让所有 blk_mem_* 重新读一遍 coe ----
+# 只改根目录的 *_16bit.coe 而不重新 generate_target，综合会用 IP 目录里的旧数据
+# （上一版就因为这样，改完颜色上板还是老样子）。
+foreach ip [get_ips -quiet] {
+    if {[catch {
+        reset_target all $ip
+        generate_target all $ip
+    } err]} {
+        puts "WARNING: regenerate $ip failed: $err"
+    } else {
+        puts "=== regenerated IP: $ip ==="
+    }
+}
+
+# reset_target 会把 IP 的“输出产物”从工程文件集里摘掉，generate_target 只把文件写回
+# 磁盘；必须再 update_compile_order 才会重新进入综合的文件列表，
+# 否则 synth 会报 "module 'blk_mem_xxx' not found"。
+update_compile_order -fileset sources_1
+
+# OOC（GENERATE_SYNTH_CHECKPOINT=1）的 IP 更麻烦：顶层综合用的是它综合出来的 .dcp，
+# 那个 .dcp 的文件条目被 reset_target 删掉之后，综合阶段会直接报 module not found。
+# 这里把它的 OOC 综合补跑一遍，并把 .dcp 重新挂回 sources_1。
+foreach n {blk_mem_bullet blk_mem_headquarters} {
+    if {[llength [get_ips -quiet $n]] == 0} { continue }
+    set ipf [get_files -quiet "$root/battle_city_fpga.srcs/sources_1/ip/$n/$n.xci"]
+    if {[llength $ipf] == 0} { continue }
+    # 注意：GENERATE_SYNTH_CHECKPOINT 只能在 .xci 的 file 对象上问，问 IP 对象会告警
+    if {![get_property GENERATE_SYNTH_CHECKPOINT [lindex $ipf 0]]} { continue }
+    set rname "${n}_synth_1"
+    if {[llength [get_runs -quiet $rname]]} {
+        if {[get_property PROGRESS [get_runs $rname]] ne "100%"} {
+            puts "=== re-launching OOC synthesis: $rname ==="
+            reset_run $rname
+            launch_runs $rname
+            wait_on_run $rname
+            if {[get_property PROGRESS [get_runs $rname]] ne "100%"} {
+                error "OOC synthesis FAILED: $rname"
+            }
+        }
+        set dcp "$root/battle_city_fpga.runs/$rname/$n.dcp"
+        if {[file exists $dcp] && [llength [get_files -quiet $dcp]] == 0} {
+            puts "=== re-attach $n.dcp to sources_1 ==="
+            add_files -norecurse -fileset sources_1 $dcp
+        }
+    }
+}
+update_compile_order -fileset sources_1
+
 reset_run synth_1
 launch_runs synth_1 -jobs 8
 wait_on_run synth_1

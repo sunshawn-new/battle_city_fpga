@@ -116,3 +116,17 @@ module blk_mem_player_tank(
 );
     always @(posedge clka) douta <= 16'h0000;
 endmodule
+
+// 炮弹贴图 ROM：10x10 = 100 项，IP 配置成 128 深 -> 7 位地址
+module blk_mem_bullet(
+    input clka, input [6:0] addra, output reg [15:0] douta
+);
+    always @(posedge clka) douta <= 16'h0000;
+endmodule
+
+// 基地贴图 ROM：20x20 = 400 项，IP 配置成 512 深 -> 9 位地址
+module blk_mem_headquarters(
+    input clka, input [8:0] addra, output reg [15:0] douta
+);
+    always @(posedge clka) douta <= 16'h0000;
+endmodule

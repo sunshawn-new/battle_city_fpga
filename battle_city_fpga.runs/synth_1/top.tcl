@@ -92,8 +92,18 @@ add_files E:/college_studies/semester202609/battle_city_fpga/river_16bit.coe
 add_files E:/college_studies/semester202609/battle_city_fpga/woods_16bit.coe
 add_files E:/college_studies/semester202609/battle_city_fpga/tank_16bit.coe
 add_files E:/college_studies/semester202609/battle_city_fpga/steel_16bit.coe
+add_files E:/college_studies/semester202609/battle_city_fpga/bullet_16bit.coe
+add_files E:/college_studies/semester202609/battle_city_fpga/headquarters_16bit.coe
+add_files -quiet E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.runs/blk_mem_bullet_synth_1/blk_mem_bullet.dcp
+set_property used_in_implementation false [get_files E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.runs/blk_mem_bullet_synth_1/blk_mem_bullet.dcp]
+add_files -quiet E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.runs/blk_mem_headquarters_synth_1/blk_mem_headquarters.dcp
+set_property used_in_implementation false [get_files E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.runs/blk_mem_headquarters_synth_1/blk_mem_headquarters.dcp]
 read_verilog -library xil_defaultlib {
+  E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.srcs/sources_1/new/bullet-ctrl.v
+  E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.srcs/sources_1/new/enemy_ctrl.v
+  E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.srcs/sources_1/new/map_bus.v
   E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.srcs/sources_1/new/player.v
+  E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.srcs/sources_1/new/terrain_probe.v
   E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.srcs/sources_1/new/vga.v
   E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.srcs/sources_1/new/top.v
 }

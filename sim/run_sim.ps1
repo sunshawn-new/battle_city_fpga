@@ -52,8 +52,23 @@ try {
     Set-Content -LiteralPath (Join-Path $PSScriptRoot 'map_mem.hex') -Value $vals -Encoding ASCII
     Write-Host ("[map] map.coe -> map_mem.hex ({0} entries)" -f $vals.Count) -ForegroundColor Cyan
 
-    # ---------- 2. 每种 BRAM 读延迟各跑一遍 ----------
+    # ---------- 2. 每种 BRAM 读延迟各跑一遍（地形 + 炮弹 + 敌人三套用例）----------
     $src = Resolve-Path (Join-Path $PSScriptRoot '..\battle_city_fpga.srcs\sources_1\new')
+    $design = @(
+        (Join-Path $src 'top.v'),
+        (Join-Path $src 'player.v'),
+        (Join-Path $src 'enemy_ctrl.v'),
+        (Join-Path $src 'vga.v'),
+        (Join-Path $src 'terrain_probe.v'),
+        (Join-Path $src 'map_bus.v'),
+        (Join-Path $src 'bullet-ctrl.v')
+    )
+    # 每套用例：名字 / 顶层 / 最少应通过的断言数
+    $tbs = @(
+        [pscustomobject]@{ Name = 'tb_terrain'; File = 'tb_terrain.v'; Min = 19 },
+        [pscustomobject]@{ Name = 'tb_bullet';  File = 'tb_bullet.v';  Min = 66 },
+        [pscustomobject]@{ Name = 'tb_enemy';   File = 'tb_enemy.v';   Min = 30 }
+    )
     $results = @()
 
     foreach ($lat in $Latency) {
@@ -66,32 +81,40 @@ try {
         $defArgs = @()
         if ($lat -ne 1) { $defArgs += @('-d', "BRAM_LATENCY_$lat") }
 
-        & $xvlog @defArgs `
-                 (Join-Path $src 'top.v') (Join-Path $src 'player.v') (Join-Path $src 'vga.v') `
-                 'bram_stubs.v' 'tb_terrain.v'
+        & $xvlog @defArgs @design 'bram_stubs.v' 'tb_terrain.v' 'tb_bullet.v' 'tb_enemy.v'
         if ($LASTEXITCODE -ne 0) { throw "xvlog failed (latency $lat)" }
 
-        & $xelab '-debug' 'typical' 'tb_terrain' '-s' 'tb_sim'
-        if ($LASTEXITCODE -ne 0) { throw "xelab failed (latency $lat)" }
+        foreach ($tb in $tbs) {
+            $snap = "sim_$($tb.Name)"
+            & $xelab '-debug' 'typical' $tb.Name '-s' $snap
+            if ($LASTEXITCODE -ne 0) { throw "xelab failed for $($tb.Name) (latency $lat)" }
 
-        $log = Join-Path $PSScriptRoot "sim_latency_$lat.log"
-        & $xsim 'tb_sim' '-R' 2>&1 | Tee-Object -FilePath $log
-        if ($LASTEXITCODE -ne 0) { throw "xsim failed (latency $lat)" }
+            $log = Join-Path $PSScriptRoot "$($tb.Name)_latency_$lat.log"
+            & $xsim $snap '-R' 2>&1 | Tee-Object -FilePath $log
+            if ($LASTEXITCODE -ne 0) { throw "xsim failed for $($tb.Name) (latency $lat)" }
 
-        $text  = Get-Content -LiteralPath $log -Raw
-        $okCnt = ([regex]::Matches($text, '\[ OK \]')).Count
-        $ngCnt = ([regex]::Matches($text, '\[FAIL\]')).Count
-        $passed = $text -match 'ALL TESTS PASSED'
-        $results += [pscustomobject]@{ Latency = $lat; Passed = $okCnt; Failed = $ngCnt; Result = $(if ($passed) { 'PASS' } else { 'FAIL' }) }
+            $text  = Get-Content -LiteralPath $log -Raw
+            $okCnt = ([regex]::Matches($text, '\[ OK \]')).Count
+            $ngCnt = ([regex]::Matches($text, '\[FAIL\]')).Count
+            $passed = $text -match 'ALL TESTS PASSED'
+            $results += [pscustomobject]@{
+                Tb      = $tb.Name
+                Latency = $lat
+                Passed  = $okCnt
+                Failed  = $ngCnt
+                Result  = $(if ($passed) { 'PASS' } else { 'FAIL' })
+                Min     = $tb.Min
+            }
+        }
     }
 
     Write-Host "`n============ summary ============" -ForegroundColor Cyan
     $results | Format-Table -AutoSize | Out-String | Write-Host
 
     $bad = 0
-    foreach ($r in $results) { if ($r.Result -ne 'PASS' -or $r.Passed -lt 15) { $bad++ } }
+    foreach ($r in $results) { if ($r.Result -ne 'PASS' -or $r.Passed -lt $r.Min) { $bad++ } }
     if ($bad -gt 0) {
-        Write-Host "$bad latency configuration(s) FAILED" -ForegroundColor Red
+        Write-Host "$bad test run(s) FAILED" -ForegroundColor Red
         exit 1
     }
     Write-Host "ALL BRAM LATENCY CONFIGURATIONS PASSED" -ForegroundColor Green
