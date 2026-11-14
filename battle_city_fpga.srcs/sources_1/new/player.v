@@ -14,7 +14,7 @@
 //    MOVE_DIV = 4_000_000 -> 25 拍/秒 -> 125 像素/秒（6.25 个车身/秒）
 // ============================================================================
 module player #(
-    WIDTH=800,
+    WIDTH=600,
     HEIGHT=600,
     TILE = 5,             // 一格 5 像素（和 map.coe / vga.v 一致）
     MOVE_DIV = 4_000_000  // 移动节拍分频：100M / MOVE_DIV 拍/秒，每拍走 TILE 像素
@@ -28,6 +28,8 @@ module player #(
     input right_enable,
     input [3:0] terrain_in_front, // 前方地形（top 中多格查询后取“最硬”的一个）
     input       terrain_valid,    // 前方地形查询完成（BRAM 有 1 拍读延迟）
+    input       respawn,          // 单拍：回到出生点（被炮弹打中后由 top 发）
+    input       freeze,           // 1 = 冻结（GAME OVER 后玩家不能再动）
     output reg [9:0] position_x,
     output reg [9:0] position_y,
     output          move_tick     // 移动节拍（板上每 40ms 一拍），top 用它定期刷新地形查询
@@ -54,7 +56,7 @@ module player #(
 
     // 上电初值（Vivado 会把这些值写进触发器的 INIT 属性，xsim 里同样生效）。
     // 这样即使板上的 reset 引脚没有正常触发，坦克也会停在屏幕中央而不是 (0,0)。
-    // 400 / 300 都是 5 的倍数，满足“坐标永远是 TILE 整数倍”的不变量。
+    // 300 / 300 都是 5 的倍数，满足“坐标永远是 TILE 整数倍”的不变量。
     initial begin
         cnt        = 24'd0;
         position_x = HALFW;
@@ -75,7 +77,11 @@ module player #(
         if (reset) begin
             position_x <= HALFW;
             position_y <= HALFH;
-        end else if (move_tick && terrain_valid) begin
+        end else if (respawn) begin
+            // 被炮弹打中后回到出生点（top 同时会给一段无敌时间，避免刚复活又挨打）
+            position_x <= HALFW;
+            position_y <= HALFH;
+        end else if (move_tick && terrain_valid && !freeze) begin
             // 只有前方地形是空地(0)或树林(4)才能前进；
             // terrain_in_front 已经包含了坦克整个前边缘接触到的所有格子
             // （terrain_probe 把这条边上的 4 格全部查一遍、取“最硬”的一个）。

@@ -17,9 +17,9 @@ INFO: [Common 17-349] Got license for feature 'Synthesis' and/or device 'xc7a35t
 INFO: [Device 21-403] Loading part xc7a35tcpg236-1
 INFO: [Synth 8-7079] Multithreading enabled for synth_design using a maximum of 2 processes.
 INFO: [Synth 8-7078] Launching helper process for spawning children vivado processes
-INFO: [Synth 8-7075] Helper process launched with PID 19268
+INFO: [Synth 8-7075] Helper process launched with PID 21004
 ---------------------------------------------------------------------------------
-Starting RTL Elaboration : Time (s): cpu = 00:00:09 ; elapsed = 00:00:11 . Memory (MB): peak = 1217.422 ; gain = 0.000
+Starting RTL Elaboration : Time (s): cpu = 00:00:09 ; elapsed = 00:00:11 . Memory (MB): peak = 1217.262 ; gain = 0.000
 ---------------------------------------------------------------------------------
 INFO: [Synth 8-638] synthesizing module 'blk_mem_bullet' [e:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.srcs/sources_1/ip/blk_mem_bullet/synth/blk_mem_bullet.vhd:67]
 	Parameter C_FAMILY bound to: artix7 - type: string 
@@ -100,18 +100,18 @@ INFO: [Synth 8-638] synthesizing module 'blk_mem_bullet' [e:/college_studies/sem
 INFO: [Synth 8-3491] module 'blk_mem_gen_v8_4_4' declared at 'e:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.srcs/sources_1/ip/blk_mem_bullet/hdl/blk_mem_gen_v8_4_vhsyn_rfs.vhd:195321' bound to instance 'U0' of component 'blk_mem_gen_v8_4_4' [e:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.srcs/sources_1/ip/blk_mem_bullet/synth/blk_mem_bullet.vhd:230]
 INFO: [Synth 8-256] done synthesizing module 'blk_mem_bullet' (9#1) [e:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.srcs/sources_1/ip/blk_mem_bullet/synth/blk_mem_bullet.vhd:67]
 ---------------------------------------------------------------------------------
-Finished RTL Elaboration : Time (s): cpu = 00:00:28 ; elapsed = 00:00:32 . Memory (MB): peak = 1343.137 ; gain = 125.715
+Finished RTL Elaboration : Time (s): cpu = 00:00:33 ; elapsed = 00:00:37 . Memory (MB): peak = 1344.508 ; gain = 127.246
 ---------------------------------------------------------------------------------
 ---------------------------------------------------------------------------------
 Start Handling Custom Attributes
 ---------------------------------------------------------------------------------
 ---------------------------------------------------------------------------------
-Finished Handling Custom Attributes : Time (s): cpu = 00:00:29 ; elapsed = 00:00:33 . Memory (MB): peak = 1343.137 ; gain = 125.715
+Finished Handling Custom Attributes : Time (s): cpu = 00:00:33 ; elapsed = 00:00:37 . Memory (MB): peak = 1344.508 ; gain = 127.246
 ---------------------------------------------------------------------------------
 ---------------------------------------------------------------------------------
-Finished RTL Optimization Phase 1 : Time (s): cpu = 00:00:29 ; elapsed = 00:00:33 . Memory (MB): peak = 1343.137 ; gain = 125.715
+Finished RTL Optimization Phase 1 : Time (s): cpu = 00:00:33 ; elapsed = 00:00:37 . Memory (MB): peak = 1344.508 ; gain = 127.246
 ---------------------------------------------------------------------------------
-Netlist sorting complete. Time (s): cpu = 00:00:00 ; elapsed = 00:00:00.008 . Memory (MB): peak = 1343.137 ; gain = 0.000
+Netlist sorting complete. Time (s): cpu = 00:00:00 ; elapsed = 00:00:00.007 . Memory (MB): peak = 1344.508 ; gain = 0.000
 INFO: [Netlist 29-17] Analyzing 1 Unisim elements for replacement
 INFO: [Netlist 29-28] Unisim Transformation completed in 0 CPU seconds
 INFO: [Project 1-570] Preparing netlist for logic optimization
@@ -124,30 +124,30 @@ Parsing XDC File [E:/college_studies/semester202609/battle_city_fpga/battle_city
 Finished Parsing XDC File [E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.runs/blk_mem_bullet_synth_1/dont_touch.xdc]
 Completed Processing XDC Constraints
 
-Netlist sorting complete. Time (s): cpu = 00:00:00 ; elapsed = 00:00:00 . Memory (MB): peak = 1343.137 ; gain = 0.000
+Netlist sorting complete. Time (s): cpu = 00:00:00 ; elapsed = 00:00:00 . Memory (MB): peak = 1344.508 ; gain = 0.000
 INFO: [Project 1-111] Unisim Transformation Summary:
 No Unisim elements were transformed.
 
-Constraint Validation Runtime : Time (s): cpu = 00:00:00 ; elapsed = 00:00:00.063 . Memory (MB): peak = 1343.137 ; gain = 0.000
+Constraint Validation Runtime : Time (s): cpu = 00:00:00 ; elapsed = 00:00:00.058 . Memory (MB): peak = 1344.508 ; gain = 0.000
 ---------------------------------------------------------------------------------
-Finished Constraint Validation : Time (s): cpu = 00:00:37 ; elapsed = 00:00:43 . Memory (MB): peak = 1343.137 ; gain = 125.715
+Finished Constraint Validation : Time (s): cpu = 00:00:44 ; elapsed = 00:00:50 . Memory (MB): peak = 1344.508 ; gain = 127.246
 ---------------------------------------------------------------------------------
 ---------------------------------------------------------------------------------
 Start Loading Part and Timing Information
 ---------------------------------------------------------------------------------
 Loading part: xc7a35tcpg236-1
 ---------------------------------------------------------------------------------
-Finished Loading Part and Timing Information : Time (s): cpu = 00:00:37 ; elapsed = 00:00:43 . Memory (MB): peak = 1343.137 ; gain = 125.715
+Finished Loading Part and Timing Information : Time (s): cpu = 00:00:44 ; elapsed = 00:00:50 . Memory (MB): peak = 1344.508 ; gain = 127.246
 ---------------------------------------------------------------------------------
 ---------------------------------------------------------------------------------
 Start Applying 'set_property' XDC Constraints
 ---------------------------------------------------------------------------------
 Applied set_property KEEP_HIERARCHY = SOFT for U0. (constraint file  E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.runs/blk_mem_bullet_synth_1/dont_touch.xdc, line 9).
 ---------------------------------------------------------------------------------
-Finished applying 'set_property' XDC Constraints : Time (s): cpu = 00:00:37 ; elapsed = 00:00:43 . Memory (MB): peak = 1343.137 ; gain = 125.715
+Finished applying 'set_property' XDC Constraints : Time (s): cpu = 00:00:45 ; elapsed = 00:00:50 . Memory (MB): peak = 1344.508 ; gain = 127.246
 ---------------------------------------------------------------------------------
 ---------------------------------------------------------------------------------
-Finished RTL Optimization Phase 2 : Time (s): cpu = 00:00:38 ; elapsed = 00:00:44 . Memory (MB): peak = 1343.137 ; gain = 125.715
+Finished RTL Optimization Phase 2 : Time (s): cpu = 00:00:45 ; elapsed = 00:00:50 . Memory (MB): peak = 1344.508 ; gain = 127.246
 ---------------------------------------------------------------------------------
 ---------------------------------------------------------------------------------
 Start RTL Component Statistics 
@@ -169,25 +169,25 @@ Finished Part Resource Summary
 Start Cross Boundary and Area Optimization
 ---------------------------------------------------------------------------------
 ---------------------------------------------------------------------------------
-Finished Cross Boundary and Area Optimization : Time (s): cpu = 00:00:39 ; elapsed = 00:00:45 . Memory (MB): peak = 1343.137 ; gain = 125.715
+Finished Cross Boundary and Area Optimization : Time (s): cpu = 00:00:47 ; elapsed = 00:00:52 . Memory (MB): peak = 1344.508 ; gain = 127.246
 ---------------------------------------------------------------------------------
 ---------------------------------------------------------------------------------
 Start Applying XDC Timing Constraints
 ---------------------------------------------------------------------------------
 ---------------------------------------------------------------------------------
-Finished Applying XDC Timing Constraints : Time (s): cpu = 00:00:46 ; elapsed = 00:00:52 . Memory (MB): peak = 1343.137 ; gain = 125.715
+Finished Applying XDC Timing Constraints : Time (s): cpu = 00:00:55 ; elapsed = 00:01:01 . Memory (MB): peak = 1344.508 ; gain = 127.246
 ---------------------------------------------------------------------------------
 ---------------------------------------------------------------------------------
 Start Timing Optimization
 ---------------------------------------------------------------------------------
 ---------------------------------------------------------------------------------
-Finished Timing Optimization : Time (s): cpu = 00:00:46 ; elapsed = 00:00:52 . Memory (MB): peak = 1343.137 ; gain = 125.715
+Finished Timing Optimization : Time (s): cpu = 00:00:55 ; elapsed = 00:01:01 . Memory (MB): peak = 1344.508 ; gain = 127.246
 ---------------------------------------------------------------------------------
 ---------------------------------------------------------------------------------
 Start Technology Mapping
 ---------------------------------------------------------------------------------
 ---------------------------------------------------------------------------------
-Finished Technology Mapping : Time (s): cpu = 00:00:46 ; elapsed = 00:00:52 . Memory (MB): peak = 1343.137 ; gain = 125.715
+Finished Technology Mapping : Time (s): cpu = 00:00:55 ; elapsed = 00:01:01 . Memory (MB): peak = 1344.508 ; gain = 127.246
 ---------------------------------------------------------------------------------
 ---------------------------------------------------------------------------------
 Start IO Insertion
@@ -205,37 +205,37 @@ Start Final Netlist Cleanup
 Finished Final Netlist Cleanup
 ---------------------------------------------------------------------------------
 ---------------------------------------------------------------------------------
-Finished IO Insertion : Time (s): cpu = 00:00:50 ; elapsed = 00:00:57 . Memory (MB): peak = 1343.137 ; gain = 125.715
+Finished IO Insertion : Time (s): cpu = 00:01:00 ; elapsed = 00:01:07 . Memory (MB): peak = 1344.508 ; gain = 127.246
 ---------------------------------------------------------------------------------
 ---------------------------------------------------------------------------------
 Start Renaming Generated Instances
 ---------------------------------------------------------------------------------
 ---------------------------------------------------------------------------------
-Finished Renaming Generated Instances : Time (s): cpu = 00:00:50 ; elapsed = 00:00:57 . Memory (MB): peak = 1343.137 ; gain = 125.715
+Finished Renaming Generated Instances : Time (s): cpu = 00:01:00 ; elapsed = 00:01:07 . Memory (MB): peak = 1344.508 ; gain = 127.246
 ---------------------------------------------------------------------------------
 ---------------------------------------------------------------------------------
 Start Rebuilding User Hierarchy
 ---------------------------------------------------------------------------------
 ---------------------------------------------------------------------------------
-Finished Rebuilding User Hierarchy : Time (s): cpu = 00:00:50 ; elapsed = 00:00:57 . Memory (MB): peak = 1343.137 ; gain = 125.715
+Finished Rebuilding User Hierarchy : Time (s): cpu = 00:01:00 ; elapsed = 00:01:07 . Memory (MB): peak = 1344.508 ; gain = 127.246
 ---------------------------------------------------------------------------------
 ---------------------------------------------------------------------------------
 Start Renaming Generated Ports
 ---------------------------------------------------------------------------------
 ---------------------------------------------------------------------------------
-Finished Renaming Generated Ports : Time (s): cpu = 00:00:50 ; elapsed = 00:00:57 . Memory (MB): peak = 1343.137 ; gain = 125.715
+Finished Renaming Generated Ports : Time (s): cpu = 00:01:00 ; elapsed = 00:01:07 . Memory (MB): peak = 1344.508 ; gain = 127.246
 ---------------------------------------------------------------------------------
 ---------------------------------------------------------------------------------
 Start Handling Custom Attributes
 ---------------------------------------------------------------------------------
 ---------------------------------------------------------------------------------
-Finished Handling Custom Attributes : Time (s): cpu = 00:00:50 ; elapsed = 00:00:57 . Memory (MB): peak = 1343.137 ; gain = 125.715
+Finished Handling Custom Attributes : Time (s): cpu = 00:01:00 ; elapsed = 00:01:07 . Memory (MB): peak = 1344.508 ; gain = 127.246
 ---------------------------------------------------------------------------------
 ---------------------------------------------------------------------------------
 Start Renaming Generated Nets
 ---------------------------------------------------------------------------------
 ---------------------------------------------------------------------------------
-Finished Renaming Generated Nets : Time (s): cpu = 00:00:50 ; elapsed = 00:00:57 . Memory (MB): peak = 1343.137 ; gain = 125.715
+Finished Renaming Generated Nets : Time (s): cpu = 00:01:00 ; elapsed = 00:01:07 . Memory (MB): peak = 1344.508 ; gain = 127.246
 ---------------------------------------------------------------------------------
 ---------------------------------------------------------------------------------
 Start Writing Synthesis Report
@@ -254,18 +254,18 @@ Report Cell Usage:
 |1     |RAMB18E1 |     1|
 +------+---------+------+
 ---------------------------------------------------------------------------------
-Finished Writing Synthesis Report : Time (s): cpu = 00:00:50 ; elapsed = 00:00:57 . Memory (MB): peak = 1343.137 ; gain = 125.715
+Finished Writing Synthesis Report : Time (s): cpu = 00:01:00 ; elapsed = 00:01:07 . Memory (MB): peak = 1344.508 ; gain = 127.246
 ---------------------------------------------------------------------------------
 Synthesis finished with 0 errors, 0 critical warnings and 0 warnings.
-Synthesis Optimization Runtime : Time (s): cpu = 00:00:19 ; elapsed = 00:00:54 . Memory (MB): peak = 1343.137 ; gain = 125.715
-Synthesis Optimization Complete : Time (s): cpu = 00:00:51 ; elapsed = 00:00:57 . Memory (MB): peak = 1343.137 ; gain = 125.715
+Synthesis Optimization Runtime : Time (s): cpu = 00:00:24 ; elapsed = 00:01:02 . Memory (MB): peak = 1344.508 ; gain = 127.246
+Synthesis Optimization Complete : Time (s): cpu = 00:01:01 ; elapsed = 00:01:07 . Memory (MB): peak = 1344.508 ; gain = 127.246
 INFO: [Project 1-571] Translating synthesized netlist
-Netlist sorting complete. Time (s): cpu = 00:00:00 ; elapsed = 00:00:00.001 . Memory (MB): peak = 1343.137 ; gain = 0.000
+Netlist sorting complete. Time (s): cpu = 00:00:00 ; elapsed = 00:00:00.002 . Memory (MB): peak = 1344.508 ; gain = 0.000
 INFO: [Netlist 29-17] Analyzing 1 Unisim elements for replacement
 INFO: [Netlist 29-28] Unisim Transformation completed in 0 CPU seconds
 INFO: [Project 1-570] Preparing netlist for logic optimization
 INFO: [Opt 31-138] Pushed 0 inverter(s) to 0 load pin(s).
-Netlist sorting complete. Time (s): cpu = 00:00:00 ; elapsed = 00:00:00 . Memory (MB): peak = 1343.137 ; gain = 0.000
+Netlist sorting complete. Time (s): cpu = 00:00:00 ; elapsed = 00:00:00 . Memory (MB): peak = 1344.508 ; gain = 0.000
 INFO: [Project 1-111] Unisim Transformation Summary:
 No Unisim elements were transformed.
 
@@ -273,10 +273,10 @@ Synth Design complete, checksum: a7718ad0
 INFO: [Common 17-83] Releasing license: Synthesis
 19 Infos, 0 Warnings, 0 Critical Warnings and 0 Errors encountered.
 synth_design completed successfully
-synth_design: Time (s): cpu = 00:00:56 ; elapsed = 00:01:06 . Memory (MB): peak = 1343.137 ; gain = 125.715
+synth_design: Time (s): cpu = 00:01:07 ; elapsed = 00:01:17 . Memory (MB): peak = 1344.508 ; gain = 127.246
 INFO: [Common 17-1381] The checkpoint 'E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.runs/blk_mem_bullet_synth_1/blk_mem_bullet.dcp' has been generated.
-INFO: [Coretcl 2-1648] Added synthesis output to IP cache for IP blk_mem_bullet, cache-ID = 478b75476e3b52c7
+INFO: [Coretcl 2-1648] Added synthesis output to IP cache for IP blk_mem_bullet, cache-ID = 636146d4f48bea1a
 INFO: [Coretcl 2-1174] Renamed 6 cell refs.
 INFO: [Common 17-1381] The checkpoint 'E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.runs/blk_mem_bullet_synth_1/blk_mem_bullet.dcp' has been generated.
 INFO: [runtcl-4] Executing : report_utilization -file blk_mem_bullet_utilization_synth.rpt -pb blk_mem_bullet_utilization_synth.pb
-INFO: [Common 17-206] Exiting Vivado at Fri Nov 13 16:36:41 2026...
+INFO: [Common 17-206] Exiting Vivado at Sat Nov 14 15:47:55 2026...

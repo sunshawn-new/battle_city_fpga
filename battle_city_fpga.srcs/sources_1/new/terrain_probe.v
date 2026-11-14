@@ -27,7 +27,7 @@
 //    S_SCAN 第 0 拍把地址锁进 map_addr，1~3 拍保持，第 4 拍采样。
 // ============================================================================
 module terrain_probe #(
-    parameter MAP_W  = 160,     // 地图横向格数
+    parameter MAP_W  = 120,     // 地图横向格数（600px / 5）
     parameter MAP_H  = 120,     // 地图纵向格数
     parameter TILE   = 5,       // 每格像素
     parameter TANK_W = 20,      // 宿主（坦克）宽
@@ -107,9 +107,11 @@ module terrain_probe #(
         endcase
     end
 
-    // row * 160 + col（160 = 128 + 32，用移位代替乘法）
-    // 最大 119*160 + 159 = 19199，15 位地址足够
-    wire [15:0] scan_row_base = ({8'd0, scan_row} << 7) + ({8'd0, scan_row} << 5);
+    // row * MAP_W + col。当前 MAP_W = 120 = 128 - 8，写成 (row<<7) - (row<<3)，
+    // 只有两级移位 + 一级加法（比 *160 的 128+32 还少一次进位链）。
+    // 最大 119*120 + 119 = 14399，15 位地址足够（BRAM 深度 19200，尾部空着）。
+    // 注意：改地图宽度时这里必须跟着改 —— 别处不要再出现 *160 这类魔法数。
+    wire [15:0] scan_row_base = ({8'd0, scan_row} << 7) - ({8'd0, scan_row} << 3);
     wire [15:0] scan_addr     = scan_row_base + {8'd0, scan_col};
     // 除 5 的快速写法：直接写 v / 5 会被 Vivado 综合成“移位-减法”除法器
     // （实测 14 级 CARRY4、23 级逻辑、17ns）。改用“乘 205 再右移 10 位”：

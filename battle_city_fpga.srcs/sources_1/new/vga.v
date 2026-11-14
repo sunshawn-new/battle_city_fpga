@@ -2,7 +2,8 @@
 
 module vga #(
     parameter N_B = 4,            // 炮弹对象池深度（和 bullet_ctrl 的 N_B 保持一致）
-    parameter N_E = 3             // 敌方坦克辆数（和 enemy_ctrl 的 N_E 保持一致）
+    parameter N_E = 3,            // 敌方坦克辆数（和 enemy_ctrl 的 N_E 保持一致）
+    parameter N_FX = 4            // 爆炸槽数（和 fx_ctrl 的 N_FX 保持一致）
 )(
     input clock,                  // 100MHz
     input reset,
@@ -20,6 +21,23 @@ module vga #(
     input wire [N_E*10-1:0] enemy_x,
     input wire [N_E*10-1:0] enemy_y,
     input wire [N_E*2-1:0]  enemy_dir,
+    // 兵种：第 i 辆占 enemy_type[i*2 +: 2]（00 快速 / 01 火力 / 10 装甲）
+    input wire [N_E*2-1:0]  enemy_type,
+    // 炮弹归属：第 i 位 1 = 这发是敌人打的（画成偏品红，和玩家的白弹区分）
+    input wire [N_B-1:0]    bullet_owner,
+    // 爆炸图层：和炮弹/敌人一样扁平打包（第 i 个槽占 x[i*10 +: 10] / frame[i*2 +: 2]）
+    input wire [N_FX-1:0]    fx_valid,
+    input wire [N_FX*10-1:0] fx_x,
+    input wire [N_FX*10-1:0] fx_y,
+    input wire [N_FX*2-1:0]  fx_frame,   // 0 = 亮爆团，1 = 星形环
+    // 基地状态：1 = 已被炮弹打爆（基地图层换成“白旗”贴图）
+    input wire              hq_destroyed,
+    // ---------------- HUD（右侧 200px 信息栏，见 hud.v）----------------
+    input wire [3:0]        hud_score100,
+    input wire [2:0]        hud_lives,
+    input wire [2:0]        hud_level,
+    input wire              hud_game_over,
+    input wire              hud_victory,
     output wire vga_clk,
     output [11:0] disp_RGB,
     output wire hsync,
@@ -29,7 +47,7 @@ module vga #(
     // 组合逻辑里 assign 出来的中间信号，显式声明（原来靠隐式网线，综合有警告）
     wire dat_act, hsync_raw, vsync_raw;
 
-    // 800x600 @ 60Hz 的参数
+    // 800x600 @ 60Hz 的参数（画面尺寸没变；左边 600px 是玩区，右边 200px 是 HUD）
     localparam [10:0] H_SYNC_END  = 11'd119,
                       H_DAT_BEGIN = 11'd184,
                       H_DAT_END   = 11'd984,
@@ -73,13 +91,67 @@ module vga #(
     wire [10:0] img_x = hcount - H_DAT_BEGIN;   // 0..799
     wire [10:0] img_y = vcount - V_DAT_BEGIN;   // 0..599
 
+    // ---- sys_clk -> vga_clk 单级同步（几何信号）----
+    // 位置/朝向都在 sys 域更新（12.5~25Hz，准静态），vga 域只读。
+    // 直接跨域使用的话，sys 域寄存器会经减法器/比较器一路打到坦克 ROM 的地址口，
+    // 时序报告里 sys_clk_pin -> vga_clk 那条最紧的路径（route 占 75%）就是它。
+    // 这里先打一拍：跨域只剩“FF -> FF”的走线，地址由 vga 域寄存器驱动。
+    // 位置是准静态的，画面不会延迟（最多晚 1 个 vga_clk 看到新坐标，远小于 1 像素）。
+    reg [9:0]          position_x_q, position_y_q;
+    reg [1:0]          player_direction_q;
+    reg [N_E-1:0]      enemy_valid_q;
+    reg [N_E*10-1:0]   enemy_x_q, enemy_y_q;
+    reg [N_E*2-1:0]    enemy_dir_q, enemy_type_q;
+    reg [N_B-1:0]      bullet_valid_q;
+    reg [N_B*10-1:0]   bullet_x_q, bullet_y_q;
+    reg [N_B*2-1:0]    bullet_dir_q;
+    reg [N_B-1:0]      bullet_owner_q;   // 1 = 敌人打的（画成偏品红）
+    reg [N_FX-1:0]     fx_valid_q;
+    reg [N_FX*10-1:0]  fx_x_q, fx_y_q;
+    reg [N_FX*2-1:0]   fx_frame_q;
+
+    // 像素坐标也打一拍：HUD 是纯组合逻辑（字模在 LUT 里，没有 ROM 延迟），
+    // 必须和 map/贴图 ROM 的 1 拍读延迟对齐，否则整块侧栏会左移 1 像素。
+    reg [10:0]         img_x_d1, img_y_d1;
+
+    always @(posedge vga_clk) begin
+        img_x_d1           <= img_x;
+        img_y_d1           <= img_y;
+        position_x_q       <= position_x;
+        position_y_q       <= position_y;
+        player_direction_q <= player_direction;
+        enemy_valid_q      <= enemy_valid;
+        enemy_x_q          <= enemy_x;
+        enemy_y_q          <= enemy_y;
+        enemy_dir_q        <= enemy_dir;
+        enemy_type_q       <= enemy_type;
+        bullet_valid_q     <= bullet_valid;
+        bullet_x_q         <= bullet_x;
+        bullet_y_q         <= bullet_y;
+        bullet_dir_q       <= bullet_dir;
+        bullet_owner_q     <= bullet_owner;
+        fx_valid_q         <= fx_valid;
+        fx_x_q             <= fx_x;
+        fx_y_q             <= fx_y;
+        fx_frame_q         <= fx_frame;
+    end
+
+    // ---------------- 玩区：左边 600px 是地图，右边 200px 是 HUD ----------------
+    // 地图 120x120 格 x 5px = 600x600，和 800x600 的扫描时序完全无关
+    // （时序参数一个都没动，只是把 x >= 600 的像素让给侧栏）。
+    localparam [10:0] PLAY_W = 11'd600;
+
     // 1. 计算当前像素属于哪个 5x5 的格子
-    wire [7:0] tile_x = img_x / 5;  // 0~159
+    wire [7:0] tile_x = img_x / 5;  // 0~119（HUD 区算出 120~159，被下面的门控挡掉）
     wire [6:0] tile_y = img_y / 5;  // 0~119
     wire [2:0] local_x = img_x - (tile_x * 5);
     wire [2:0] local_y = img_y - (tile_y * 5);
     wire [14:0] tile_y_ext = {8'b0, tile_y};
-    assign map_addr = (tile_y_ext << 7) + (tile_y_ext << 5) + {7'b0, tile_x}; // tile_y * 160 + tile_x
+    // 地图宽 120 格：row*120 = (row<<7) - (row<<3)（比原来的 *160 少一级加法）
+    wire [14:0] row_base = (tile_y_ext << 7) - (tile_y_ext << 3);
+    // HUD 区域不读地图：那边 tile_x 已经跑到 120..159（地图外），
+    // 与其让它读到填充区，不如直接钉在 0 —— 反正侧栏会整片盖住。
+    assign map_addr = (img_x < PLAY_W) ? (row_base + {8'b0, tile_x}) : 15'd0;
 
     // ---3. 查地形贴图---
     // 取模 20 得到在 20x20 地形贴图里的相对坐标
@@ -116,10 +188,10 @@ module vga #(
 
     // 玩家坦克：20x20 包围盒命中，命中才产生贴图地址。
     // 用无符号相减 + “< 20” 判断越界：img_x < position_x 时会回绕成很大的数。
-    wire [10:0] pdx = img_x - position_x;
-    wire [10:0] pdy = img_y - position_y;
+    wire [10:0] pdx = img_x - position_x_q;
+    wire [10:0] pdy = img_y - position_y_q;
     wire        player_on   = (pdx < 11'd20) && (pdy < 11'd20);
-    wire [8:0]  player_addr = tank_addr(pdx[4:0], pdy[4:0], player_direction);
+    wire [8:0]  player_addr = tank_addr(pdx[4:0], pdy[4:0], player_direction_q);
 
     // 敌人坦克：同样的把式，每辆各算一遍（3 辆车 = 3 组比较器/小加法，很便宜）
     wire [N_E-1:0]   ehit;
@@ -127,63 +199,59 @@ module vga #(
     genvar ge;
     generate
         for (ge = 0; ge < N_E; ge = ge + 1) begin : g_enemy_tank
-            wire [9:0]  ex = enemy_x[ge*10 +: 10];
-            wire [9:0]  ey = enemy_y[ge*10 +: 10];
-            wire [1:0]  ed = enemy_dir[ge*2 +: 2];
+            wire [9:0]  ex = enemy_x_q[ge*10 +: 10];
+            wire [9:0]  ey = enemy_y_q[ge*10 +: 10];
+            wire [1:0]  ed = enemy_dir_q[ge*2 +: 2];
             wire [10:0] edx = img_x - {1'b0, ex};
             wire [10:0] edy = img_y - {1'b0, ey};
 
-            assign ehit[ge] = enemy_valid[ge] && (edx < 11'd20) && (edy < 11'd20);
+            assign ehit[ge] = enemy_valid_q[ge] && (edx < 11'd20) && (edy < 11'd20);
             assign e_addr_all[ge*9 +: 9] = tank_addr(edx[4:0], edy[4:0], ed);
         end
     endgenerate
 
     // 同一个像素最多只落在 1 辆车上（还没有“坦克互斥”，重叠时按 玩家 > 编号小的敌人）。
-    // 选中哪一辆，决定 ROM 地址，也决定这颗像素要不要染成灰色。
+    // 选中哪一辆，同时决定 ROM 地址、用玩家贴图还是兵种贴图（tank_is_enemy/tank_type_sel）。
     reg [8:0] tank_addr_mux;
     reg       tank_on;
     reg       tank_is_enemy;
+    reg [1:0] tank_type_sel;    // 选中那辆敌人的兵种（玩家时无意义）
     integer   ti;
     always @(*) begin
         tank_addr_mux = 9'd0;
         tank_on       = 1'b0;
         tank_is_enemy = 1'b0;
+        tank_type_sel = 2'd0;
         for (ti = 0; ti < N_E; ti = ti + 1)
             if (!tank_on && ehit[ti]) begin
                 tank_addr_mux = e_addr_all[ti*9 +: 9];
                 tank_on       = 1'b1;
                 tank_is_enemy = 1'b1;
+                tank_type_sel = enemy_type_q[ti*2 +: 2];
             end
         if (player_on) begin
             tank_addr_mux = player_addr;
             tank_on       = 1'b1;
             tank_is_enemy = 1'b0;
+            tank_type_sel = 2'd0;
         end
     end
 
-    // 敌人坦克 = 玩家贴图 + 换色（原版敌方坦克是灰的）。
-    // tank.png 只有 3 种不透明色，coe 里的 12 位值就是下面这三个，
-    // 所以三个比较器就够 —— 不必为敌人再单独做一个 ROM / IP。
-    //   0xFD3 车体（黄）   0xA60 炮管/暗部（深黄）   0x310 描边（近黑）
-    // >>> 以后改 tank.png 的配色，这三个常量必须跟着改，否则敌人又变回黄色。
-    //     （查法：读 tank_16bit.coe 里的不透明值，取低 12 位。）
-    function [11:0] enemy_tint;
-        input [11:0] c;
-        begin
-            case (c)
-                12'hFD3: enemy_tint = 12'hCCC;   // 车体 -> 浅灰
-                12'hA60: enemy_tint = 12'h777;   // 炮管/暗部 -> 中灰
-                12'h310: enemy_tint = 12'h310;   // 描边保持近黑
-                default: enemy_tint = c;
-            endcase
-        end
-    endfunction
+    // 敌人坦克：不再“玩家贴图 + 换色”，而是每种兵种一张独立 ROM
+    // （img/tank_fast|power|armor.png -> tank_*_16bit.coe）。
+    // 换色的老做法（enemy_tint 三个常量）删掉了：它把敌人绑死在玩家坦克的
+    // 调色板上，换一次玩家配色就得同步一次常量，而且三辆车全灰、看不出兵种。
+    // 现在玩家 1 张 + 敌人 3 张，共 4 个 512x16 单口 ROM，地址都来自
+    // tank_addr_mux（旋转规则完全一样），只在“出像素”这一层按兵种 mux 一次。
 
     wire [15:0] brick_pixel;
     wire [15:0] river_pixel;
     wire [15:0] steel_pixel;
     wire [15:0] woods_pixel;
-    wire [15:0] tank_pixel;      // 玩家和敌人共用这一张贴图（地址由 tank_addr_mux 选）
+    wire [15:0] tank_pixel_pl;   // 玩家（黄）
+    wire [15:0] tank_pixel_fast; // 快速（淡青）
+    wire [15:0] tank_pixel_power;// 火力（亮橙）
+    wire [15:0] tank_pixel_armor;// 装甲（亮绿）
     
     blk_mem_brick brick_rom(
         .clka(vga_clk),
@@ -205,19 +273,114 @@ module vga #(
         .addra(local_addr),
         .douta(woods_pixel)
     );
+    // 4 个 ROM 共用同一个地址（贴图的旋转规则一样），只是数据不同。
+    // 512x16 的单口 ROM 各占半个 BRAM36（4 个 = 2 个 BRAM36），比“把 4 张图
+    // 拼成一张 2048 深的贴图表”省地址逻辑，也和现有 brick/river/... 的做法一致。
+    //
+    // HUD 的敌人图标复用这 4 张图：图标区域的像素不在玩区里（x >= 600），
+    // 坦克图层不可能同时命中，所以直接把地址 mux 过去就行 —— 不用第 5 张图。
+    // （HUD 的输出在这里先声明，实例在下面第 5 节之前；Verilog 的显式 net
+    //   声明必须在使用之前，否则会被当成 1 位的隐式网线，9 位地址会被截断。）
+    wire        hud_on, hud_icon_on;
+    wire [11:0] hud_rgb;
+    wire [8:0]  hud_icon_addr;
+    wire [1:0]  hud_icon_type;
+
+    wire [8:0] tank_rom_addr = hud_icon_on ? hud_icon_addr : tank_addr_mux;
+
     blk_mem_player_tank tank_rom(
         .clka(vga_clk),
-        .addra(tank_addr_mux),
-        .douta(tank_pixel)
+        .addra(tank_rom_addr),
+        .douta(tank_pixel_pl)
+    );
+    blk_mem_tank_fast tank_fast_rom(
+        .clka(vga_clk),
+        .addra(tank_rom_addr),
+        .douta(tank_pixel_fast)
+    );
+    blk_mem_tank_power tank_power_rom(
+        .clka(vga_clk),
+        .addra(tank_rom_addr),
+        .douta(tank_pixel_power)
+    );
+    blk_mem_tank_armor tank_armor_rom(
+        .clka(vga_clk),
+        .addra(tank_rom_addr),
+        .douta(tank_pixel_armor)
     );
 
+    // ---------------- 爆炸图层（坦克被击毁的 2 帧动画，状态在 fx_ctrl.v）----------------
+    // 贴图也是 20x20（400 项 / IP 512 深），但爆炸图案中心对称，不按朝向旋转，
+    // 地址就是 row*20 + col（和坦克的 tank_addr 不同，省掉旋转的 case）。
+    // 两张图共用同一个地址、只在“出像素”这一层按 fx_frame 选一次，
+    // 和坦克 4 张 ROM 的做法一致。
+    wire [N_FX-1:0]   fx_hit;
+    wire [N_FX*9-1:0] fx_addr_all;
+    genvar gf;
+    generate
+        for (gf = 0; gf < N_FX; gf = gf + 1) begin : g_fx_layer
+            wire [9:0]  fxx = fx_x_q[gf*10 +: 10];
+            wire [9:0]  fxy = fx_y_q[gf*10 +: 10];
+            wire [10:0] fdx = img_x - {1'b0, fxx};
+            wire [10:0] fdy = img_y - {1'b0, fxy};
+
+            assign fx_hit[gf] = fx_valid_q[gf] && (fdx < 11'd20) && (fdy < 11'd20);
+            assign fx_addr_all[gf*9 +: 9] = ({4'b0, fdy[4:0]} << 4)
+                                          + ({4'b0, fdy[4:0]} << 2)
+                                          + {4'b0, fdx[4:0]};
+        end
+    endgenerate
+
+    // 一个像素最多落在一个爆炸上（爆炸只有 20x20，槽之间可能重叠 -> 取编号小的）
+    reg [8:0] fx_addr_mux;
+    reg       fx_on;
+    reg [1:0] fx_frame_sel;
+    integer   fi;
+    always @(*) begin
+        fx_addr_mux  = 9'd0;
+        fx_on        = 1'b0;
+        fx_frame_sel = 2'd0;
+        for (fi = 0; fi < N_FX; fi = fi + 1)
+            if (!fx_on && fx_hit[fi]) begin
+                fx_addr_mux  = fx_addr_all[fi*9 +: 9];
+                fx_on        = 1'b1;
+                fx_frame_sel = fx_frame_q[fi*2 +: 2];
+            end
+    end
+
+    wire [15:0] boom_burst_pixel;   // 第 0 帧：亮黄白色的实心爆团
+    wire [15:0] boom_ring_pixel;    // 第 1 帧：橙色的星形环
+    blk_mem_tank_destroyed1 boom_burst_rom(
+        .clka(vga_clk),
+        .addra(fx_addr_mux),
+        .douta(boom_burst_pixel)
+    );
+    blk_mem_tank_destroyed2 boom_ring_rom(
+        .clka(vga_clk),
+        .addra(fx_addr_mux),
+        .douta(boom_ring_pixel)
+    );
+
+    // 和 ROM 的 1 拍读延迟对齐（命中信号 / 帧号都要打一拍）
+    reg       fx_on_d1;
+    reg [1:0] fx_frame_sel_d1;
+    always @(posedge vga_clk) begin
+        fx_on_d1        <= fx_on;
+        fx_frame_sel_d1 <= fx_frame_sel;
+    end
+    wire [15:0] fx_pixel = (fx_frame_sel_d1 == 2'd0) ? boom_burst_pixel
+                                                     : boom_ring_pixel;
+
     // ---------------- 基地（HQ）图层 ----------------
-    // map.coe 里的基地是 8x6 个格子（40x30 像素：x 380..419 / y 560..589），
+    // map.coe 里的基地是 8x6 个格子（40x30 像素：x 280..319 / y 560..589），
     // 而 headquarters.png 只有 20x20，所以把鹰居中画在这块区域中间：
-    //   x 390..409，y 565..584
+    //   x 290..309，y 565..584
     // 位置只影响画面，改地图时同步这两个常量即可（不参与任何碰撞/移动逻辑，
     // 基地占不占地由 terrain_probe 读 tile_id == 5 决定）。
-    localparam [10:0] HQ_X0 = 11'd390,
+    // 600x600 玩区之后基地整体左移 100px（原 390 -> 290）：
+    // 地图里的基地方块仍是 格 56..63 x 112..117（块 14..15 x 28..29），
+    // 精灵居中画在其中 40x30 的矩形里，所以占 格 58..61 x 113..116。
+    localparam [10:0] HQ_X0 = 11'd290,
                       HQ_Y0 = 11'd565;
 
     wire [10:0] hq_dx = img_x - HQ_X0;      // 无符号相减：越界会回绕成很大的数
@@ -227,12 +390,26 @@ module vga #(
     wire [8:0]  hq_addr = ({4'b0, hq_dy[4:0]} << 4) + ({4'b0, hq_dy[4:0]} << 2)
                         + {4'b0, hq_dx[4:0]};
 
-    wire [15:0] hq_pixel;
+    // 两张基地贴图：完好（金鹰）和被打爆（白旗 + 断杆 + 碎石）。
+    // hq_destroyed 由 top 锁存（上电 0，被炮弹打中后永久 1，本工程没有重开一局），
+    // 两张图用同一个地址，所以直接 mux 不会有一帧错位。
+    // 它来自 sys 域，这里同样先打一拍再进 mux（准静态信号，晚 1 拍无影响）。
+    reg hq_destroyed_q;
+    always @(posedge vga_clk) hq_destroyed_q <= hq_destroyed;
+
+    wire [15:0] hq_pixel_live;
+    wire [15:0] hq_pixel_dead;
     blk_mem_headquarters hq_rom(
         .clka(vga_clk),
         .addra(hq_addr),
-        .douta(hq_pixel)
+        .douta(hq_pixel_live)
     );
+    blk_mem_hq_destroyed hq_dead_rom(
+        .clka(vga_clk),
+        .addra(hq_addr),
+        .douta(hq_pixel_dead)
+    );
+    wire [15:0] hq_pixel = hq_destroyed_q ? hq_pixel_dead : hq_pixel_live;
 
     reg hq_on_d1;           // 和 ROM 的 1 拍读延迟对齐
     always @(posedge vga_clk) begin
@@ -253,9 +430,9 @@ module vga #(
     genvar gb;
     generate
         for (gb = 0; gb < N_B; gb = gb + 1) begin : g_bullet
-            wire [9:0] bx = bullet_x[gb*10 +: 10];
-            wire [9:0] by = bullet_y[gb*10 +: 10];
-            wire [1:0] bd = bullet_dir[gb*2 +: 2];
+            wire [9:0] bx = bullet_x_q[gb*10 +: 10];
+            wire [9:0] by = bullet_y_q[gb*10 +: 10];
+            wire [1:0] bd = bullet_dir_q[gb*2 +: 2];
             // 无符号相减：img_x < bx 时会回绕成很大的数，天然被 <10 的判断排除
             wire [10:0] bdx = img_x - {1'b0, bx};
             wire [10:0] bdy = img_y - {1'b0, by};
@@ -264,7 +441,7 @@ module vga #(
             wire [6:0]  row10 = ({3'b0, bpy} << 3) + ({3'b0, bpy} << 1);   // py*10
             wire [6:0]  col10 = ({3'b0, bpx} << 3) + ({3'b0, bpx} << 1);   // px*10
 
-            assign bhit[gb] = bullet_valid[gb] && (bdx < 11'd10) && (bdy < 11'd10);
+            assign bhit[gb] = bullet_valid_q[gb] && (bdx < 11'd10) && (bdy < 11'd10);
             assign b_addr_all[gb*7 +: 7] = (bd == 2'b00) ? (row10 + {3'b0, bpx}) :
                                            (bd == 2'b01) ? (7'd99 - row10 - {3'b0, bpx}) :
                                            (bd == 2'b10) ? (col10 + 7'd9 - {3'b0, bpy}) :
@@ -274,14 +451,17 @@ module vga #(
 
     reg [6:0] bullet_addr;
     reg       bullet_on;
+    reg       bullet_is_enemy;      // 选中这发炮弹的归属（1 = 敌人打的）
     integer bi;
     always @(*) begin
-        bullet_addr = 7'd0;
-        bullet_on   = 1'b0;
+        bullet_addr     = 7'd0;
+        bullet_on       = 1'b0;
+        bullet_is_enemy = 1'b0;
         for (bi = 0; bi < N_B; bi = bi + 1)
             if (bhit[bi] && !bullet_on) begin
-                bullet_addr = b_addr_all[bi*7 +: 7];
-                bullet_on   = 1'b1;
+                bullet_addr     = b_addr_all[bi*7 +: 7];
+                bullet_on       = 1'b1;
+                bullet_is_enemy = bullet_owner_q[bi];
             end
     end
 
@@ -292,9 +472,55 @@ module vga #(
         .douta(bullet_pixel)
     );
     reg bullet_on_d1;       // 和 ROM 的 1 拍读延迟对齐
+    reg bullet_is_enemy_d1;
     always @(posedge vga_clk) begin
-        bullet_on_d1 <= bullet_on;
+        bullet_on_d1       <= bullet_on;
+        bullet_is_enemy_d1 <= bullet_is_enemy;
     end
+
+    // ================================================================================
+    //  HUD：右侧 x = 600..799 的信息栏（分数 / 关卡 / 敌人图标 / 生命 / 结算横幅）
+    //
+    //  坐标喂 img_x_d1/img_y_d1（延迟一拍）：和 map ROM / 贴图 ROM 的读延迟对齐，
+    //  侧栏边界才正好落在 x = 600。颜色是纯组合的（字模在 LUT 里），不用再打拍。
+    //  hud_on 直接参与下面 final_color 的优先级判断（最高），把玩区图层整片盖掉。
+    // ================================================================================
+    // HUD 的状态输入也要先打一拍（sys -> vga 的单级同步）。
+    // 否则 game_over 会经“选行 -> 横幅 -> final_color”这条 13 级组合链直接
+    // 打到 vga 域的寄存器上，变成跨时钟长路径（实测 WNS -0.825ns，12 个端点）。
+    // 分数/生命/胜负都是准静态信号（几秒才变一次），晚一拍完全看不出来。
+    reg [3:0] hud_score100_q;
+    reg [2:0] hud_lives_q, hud_level_q;
+    reg       hud_game_over_q, hud_victory_q;
+    always @(posedge vga_clk) begin
+        hud_score100_q  <= hud_score100;
+        hud_lives_q     <= hud_lives;
+        hud_level_q     <= hud_level;
+        hud_game_over_q <= hud_game_over;
+        hud_victory_q   <= hud_victory;
+    end
+
+    hud #(.N_E(N_E)) u_hud (
+        .clock(vga_clk), .reset(reset),
+        .x(img_x_d1), .y(img_y_d1),
+        .score100(hud_score100_q), .lives(hud_lives_q), .level(hud_level_q),
+        .enemy_valid(enemy_valid_q), .enemy_type(enemy_type_q),
+        .game_over(hud_game_over_q), .victory(hud_victory_q),
+        .hud_on(hud_on), .rgb(hud_rgb),
+        .icon_on(hud_icon_on), .icon_addr(hud_icon_addr), .icon_type(hud_icon_type)
+    );
+
+    // 图标的像素来自坦克 ROM（地址已在 tank_rom_addr 里 mux 过去），
+    // 所以命中信号和兵种也要打一拍，和 douta 的 1 拍延迟对齐。
+    reg        hud_icon_on_d1;
+    reg [1:0]  hud_icon_type_d1;
+    always @(posedge vga_clk) begin
+        hud_icon_on_d1   <= hud_icon_on;
+        hud_icon_type_d1 <= hud_icon_type;
+    end
+    wire [15:0] hud_icon_pixel = (hud_icon_type_d1 == 2'd0) ? tank_pixel_fast :
+                                 (hud_icon_type_d1 == 2'd1) ? tank_pixel_power :
+                                                              tank_pixel_armor;
 
 
     // 4. 根据 BRAM 返回的 tile_id 生成背景颜色
@@ -306,7 +532,7 @@ module vga #(
             4'd2: bg_color = steel_pixel[11:0];
             4'd3: bg_color = river_pixel[11:0];
             4'd4: bg_color = woods_pixel[11:0]; // 严格来说这里冗余了，不过可以避免锁存器？
-            4'd5: begin                // 基地：直接贴 headquarters.png 的鹰
+            4'd5: begin                // 基地：金鹰；被打爆后换成白旗（同一个包围盒）
                 // 贴图不透明的地方画鹰，透明的像素留黑（和空地一个颜色）
                 if (hq_on_d1 && hq_pixel[15]) bg_color = hq_pixel[11:0];
                 else                          bg_color = 12'h000;
@@ -317,27 +543,46 @@ module vga #(
 
     // 5. 叠加图层逻辑 (坦克与草地遮挡)
     // 坦克的包围盒命中 / 贴图地址已经在上面算好了（tank_on / tank_addr_mux），
-    // 这里只要把命中信号打一拍，和 ROM 的 1 拍读延迟对齐。
-    // tank_is_enemy 一起打拍：决定这颗像素用原色还是“敌人灰”。
+    // 这里把命中信号和“选中哪辆车/哪个兵种”一起打一拍，和 ROM 的 1 拍读延迟对齐。
+    // 关键：兵种 mux 必须用打拍后的 tank_type_sel_d1 —— 这样它选中的是
+    // 【上一拍地址】对应的那辆车的 ROM 数据（本拍才从 douta 出来），
+    // 和 tank_on_d1 的时序正好一致，坦克边缘不会出现“邻居兵种”的杂色像素。
     reg tank_on_d1, tank_is_enemy_d1;
+    reg [1:0] tank_type_sel_d1;
     always @(posedge vga_clk) begin
         tank_on_d1       <= tank_on;
         tank_is_enemy_d1 <= tank_is_enemy;
+        tank_type_sel_d1 <= tank_type_sel;
     end
+
+    wire [15:0] tank_pixel = tank_is_enemy_d1
+        ? ((tank_type_sel_d1 == 2'd0) ? tank_pixel_fast  :
+           (tank_type_sel_d1 == 2'd1) ? tank_pixel_power : tank_pixel_armor)
+        : tank_pixel_pl;
 
     reg [11:0] final_color;
     always @(*) begin
-        // 图层优先级（高 -> 低）：树林 > 炮弹 > 坦克 > 地形背景
+        // 图层优先级（高 -> 低）：HUD > 树林 > 爆炸 > 炮弹 > 坦克 > 地形背景
         // 三层贴图都要看最高位（alpha）：透明像素必须露出下面的图层，
         // 否则透明区会被当成黑色画上去，坦克就成了一块黑方块。
-        if (tile_id == 4'd4 && woods_pixel[15]) begin
+        if (hud_on) begin
+            // 侧栏：面板底色 / 文字，敌人图标用坦克 ROM 的像素盖在上面
+            if (hud_icon_on_d1 && hud_icon_pixel[15]) final_color = hud_icon_pixel[11:0];
+            else                                     final_color = hud_rgb;
+        end else if (tile_id == 4'd4 && woods_pixel[15]) begin
             final_color = bg_color; // 树林层级最高，覆盖坦克和炮弹，但取决于该方格是否透明
+        end else if (fx_on_d1 && fx_pixel[15]) begin
+            // 爆炸压在炮弹和坦克上面：被击毁的坦克这一帧已经消失，
+            // 爆炸的火球正好盖住它原来的 20x20 位置和旁边的弹片
+            final_color = fx_pixel[11:0];
         end else if (bullet_on_d1 && bullet_pixel[15]) begin
-            final_color = bullet_pixel[11:0]; // 炮弹贴图的透明像素不遮坦克
+            // 敌人的炮弹把绿通道减半（白弹 -> 品红），一眼能和玩家的白弹分开
+            final_color = bullet_is_enemy_d1
+                        ? {bullet_pixel[11:8], bullet_pixel[7:5], 1'b0, bullet_pixel[3:0]}
+                        : bullet_pixel[11:0];
         end else if (tank_on_d1 && tank_pixel[15]) begin
-            // 坦克贴图的透明像素不遮背景；敌人坦克染成灰色（一眼分得出谁是谁）
-            final_color = tank_is_enemy_d1 ? enemy_tint(tank_pixel[11:0])
-                                           : tank_pixel[11:0];
+            // 坦克贴图的透明像素不遮背景；敌人兵种的颜色已经由各自的 ROM 决定
+            final_color = tank_pixel[11:0];
         end else begin
             final_color = bg_color; // 普通背景
         end

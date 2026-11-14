@@ -1,7 +1,7 @@
 Copyright 1986-2021 Xilinx, Inc. All Rights Reserved.
 -------------------------------------------------------------------------------------------------------------------------------
 | Tool Version     : Vivado v.2021.1 (win64) Build 3247384 Thu Jun 10 19:36:33 MDT 2021
-| Date             : Fri Nov 13 20:18:53 2026
+| Date             : Sat Nov 14 20:18:27 2026
 | Host             : LAPTOP-8QJD8CCP running 64-bit major release  (build 9200)
 | Command          : report_power -file top_power_routed.rpt -pb top_power_summary_routed.pb -rpx top_power_routed.rpx
 | Design           : top
@@ -30,10 +30,10 @@ Table of Contents
 ----------
 
 +--------------------------+--------------+
-| Total On-Chip Power (W)  | 0.111        |
+| Total On-Chip Power (W)  | 0.124        |
 | Design Power Budget (W)  | Unspecified* |
 | Power Budget Margin (W)  | NA           |
-| Dynamic (W)              | 0.039        |
+| Dynamic (W)              | 0.051        |
 | Device Static (W)        | 0.072        |
 | Effective TJA (C/W)      | 5.0          |
 | Max Ambient (C)          | 84.4         |
@@ -52,18 +52,19 @@ Table of Contents
 +----------------+-----------+----------+-----------+-----------------+
 | On-Chip        | Power (W) | Used     | Available | Utilization (%) |
 +----------------+-----------+----------+-----------+-----------------+
-| Clocks         |     0.006 |        4 |       --- |             --- |
-| Slice Logic    |     0.006 |     3471 |       --- |             --- |
-|   LUT as Logic |     0.005 |     1830 |     20800 |            8.80 |
-|   CARRY4       |    <0.001 |      194 |      8150 |            2.38 |
-|   Register     |    <0.001 |      890 |     41600 |            2.14 |
-|   Others       |     0.000 |       59 |       --- |             --- |
-| Signals        |     0.006 |     3010 |       --- |             --- |
-| Block RAM      |     0.018 |      7.5 |        50 |           15.00 |
+| Clocks         |     0.009 |        4 |       --- |             --- |
+| Slice Logic    |     0.008 |     6954 |       --- |             --- |
+|   LUT as Logic |     0.007 |     3768 |     20800 |           18.12 |
+|   CARRY4       |    <0.001 |      502 |      8150 |            6.16 |
+|   Register     |    <0.001 |     1594 |     41600 |            3.83 |
+|   F7/F8 Muxes  |    <0.001 |       24 |     32600 |            0.07 |
+|   Others       |     0.000 |       75 |       --- |             --- |
+| Signals        |     0.009 |     5515 |       --- |             --- |
+| Block RAM      |     0.023 |     10.5 |        50 |           21.00 |
 | DSPs           |     0.002 |       34 |        90 |           37.78 |
-| I/O            |     0.001 |       21 |       106 |           19.81 |
+| I/O            |    <0.001 |       21 |       106 |           19.81 |
 | Static Power   |     0.072 |          |           |                 |
-| Total          |     0.111 |          |           |                 |
+| Total          |     0.124 |          |           |                 |
 +----------------+-----------+----------+-----------+-----------------+
 
 
@@ -73,7 +74,7 @@ Table of Contents
 +-----------+-------------+-----------+-------------+------------+-------------+-------------+------------+
 | Source    | Voltage (V) | Total (A) | Dynamic (A) | Static (A) | Powerup (A) | Budget (A)  | Margin (A) |
 +-----------+-------------+-----------+-------------+------------+-------------+-------------+------------+
-| Vccint    |       1.000 |     0.046 |       0.036 |      0.010 |       NA    | Unspecified | NA         |
+| Vccint    |       1.000 |     0.059 |       0.049 |      0.010 |       NA    | Unspecified | NA         |
 | Vccaux    |       1.800 |     0.013 |       0.000 |      0.013 |       NA    | Unspecified | NA         |
 | Vcco33    |       3.300 |     0.001 |       0.000 |      0.001 |       NA    | Unspecified | NA         |
 | Vcco25    |       2.500 |     0.000 |       0.000 |      0.000 |       NA    | Unspecified | NA         |
@@ -140,21 +141,17 @@ Table of Contents
 3.1 By Hierarchy
 ----------------
 
-+----------------------------+-----------+
-| Name                       | Power (W) |
-+----------------------------+-----------+
-| top                        |     0.039 |
-|   g_enemy_probe[0].u_probe |     0.002 |
-|   u_bullet_ctrl            |     0.005 |
-|   u_enemy_ctrl             |     0.003 |
-|   u_map_bus                |     0.001 |
-|   u_map_ram                |     0.012 |
-|     U0                     |     0.012 |
-|       inst_blk_mem_gen     |     0.012 |
-|   u_probe                  |     0.001 |
-|   u_vga                    |     0.009 |
-|     hq_rom                 |     0.001 |
-|       U0                   |     0.001 |
-+----------------------------+-----------+
++------------------------+-----------+
+| Name                   | Power (W) |
++------------------------+-----------+
+| top                    |     0.051 |
+|   u_bullet_ctrl        |     0.011 |
+|   u_enemy_ctrl         |     0.003 |
+|   u_fx_ctrl            |     0.001 |
+|   u_map_ram            |     0.012 |
+|     U0                 |     0.012 |
+|       inst_blk_mem_gen |     0.012 |
+|   u_vga                |     0.018 |
++------------------------+-----------+
 
 

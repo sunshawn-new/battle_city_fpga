@@ -27,11 +27,12 @@
 // ============================================================================
 module enemy_ctrl #(
     parameter N_E        = 3,            // 敌方坦克辆数（VGA 的 N_E 必须一致）
-    parameter WIDTH      = 800,
+    parameter WIDTH      = 600,          // 600x600 玩区（右边 200px 是 HUD）
     parameter HEIGHT     = 600,
     parameter TILE       = 5,            // 一格 5 像素（和 player.v / map.coe 一致）
-    parameter MOVE_DIV   = 8_000_000,    // 12.5Hz：100M / MOVE_DIV 拍/秒
-    parameter TURN_TICKS = 24            // 每多少个移动节拍随机换一次向
+    parameter MOVE_DIV   = 8_000_000,    // 中间档节拍：100M / MOVE_DIV 拍/秒
+    parameter TURN_TICKS = 24,           // 每多少个移动节拍随机换一次向
+    parameter FIRE_TICKS = 4             // 开火周期基准（按自己的移动节拍计数）
 )(
     input clock,
     input reset,
@@ -41,15 +42,32 @@ module enemy_ctrl #(
     input      [N_E-1:0]    terrain_valid,   // 结果可信（查询条件 == 当前 x/y/dir）
     output     [N_E-1:0]    move_tick,       // 每辆车自己的节拍，接各自 probe 的 refresh
 
+    // ---------------- 战斗 ----------------
+    input      [N_E-1:0]    e_hit,           // 单拍：这辆车被炮弹打中（由 bullet_ctrl 报）
+    input                   freeze,          // 1 = 全冻结（GAME OVER 后不再动/不再开火）
+    output     [N_E-1:0]    e_fire,          // 单拍：请求开火（接 bullet_ctrl 的 e_fire）
+    output     [N_E-1:0]    e_kill,          // 单拍：这辆车被击毁（top 用来加分）
+
     // ---------------- 打包给 VGA（扁平打包，避免 unpacked array 端口）----------------
-    output     [N_E-1:0]    e_valid,         // 1 = 这辆车还在（以后被击毁就清 0）
+    output     [N_E-1:0]    e_valid,         // 1 = 这辆车还在
     output     [N_E*10-1:0] e_x,
     output     [N_E*10-1:0] e_y,
-    output     [N_E*2-1:0]  e_dir
+    output     [N_E*2-1:0]  e_dir,
+    output     [N_E*2-1:0]  e_type           // 兵种（VGA 按它选贴图 ROM）
 );
     // 地形编号（和 pysrc/map_generator.py / player.v / terrain_probe.v 一致）
     localparam T_EMPTY = 4'd0,
                T_WOODS = 4'd4;
+
+    // 兵种编号（和 vga.v 的 tank ROM 选择一致）：
+    //   00 = 快速坦克  -> blk_mem_tank_fast  （淡青、细炮管、窄履带）
+    //   01 = 火力坦克  -> blk_mem_tank_power （亮橙、粗炮管 + 炮口制退器）
+    //   10 = 装甲坦克  -> blk_mem_tank_armor （绿色、5px 厚履带 + 宽炮盾）
+    // 【兵种差异】不只好看：速度（STEP）、开火周期（FIRE_PERIOD）、血量（HP_MAX）
+    // 三样都不一样，见下面 generate 里的参数表。
+    localparam [1:0] T_FAST  = 2'd0,
+                     T_POWER = 2'd1,
+                     T_ARMOR = 2'd2;
 
     localparam [23:0] STEP = MOVE_DIV;
 
@@ -66,16 +84,40 @@ module enemy_ctrl #(
     generate
         for (gi = 0; gi < N_E; gi = gi + 1) begin : g_enemy
             // ---------------- 出生点 / 初始朝向 ----------------
-            // 都在真实地图第 2~5 行（那里是空地），朝下开；x 是 5 的倍数，
-            // 20x20 的车身压在自己那 4 列上，不会碰到外墙（列 0 / 列 159）。
-            //   (40,10)  列 8~11    左边，往下会撞到河（行 60 起，列 20~69）
-            //   (380,10) 列 76~79   中间，正对着桥（河的缺口 = 列 70~90）
-            //   (740,10) 列 148~151 右边，一路向下能绕过河（河只到列 139）
+            // 都在真实地图第 0~1 块（那里是空地），朝下开；x 是 5 的倍数，
+            // 20x20 的车身压在自己那 4 列上，不会碰到外墙（列 0 / 列 119）。
+            //   (40,10)  列 8~11    左边，往下去走左边那处浅滩（块列 4~6）
+            //   (300,10) 列 60~63   中间，正对玩家出生点的纵向主通道
+            //   (560,10) 列 112~115 右边，往下去走右边那处浅滩（块列 23~25）
             // N_E 超过 3 辆时，多出来的都按右边那个点出生（以后做波次再改）。
             localparam [9:0] SPAWN_X = (gi == 0) ? 10'd40 :
-                                       (gi == 1) ? 10'd380 : 10'd740;
+                                       (gi == 1) ? 10'd300 : 10'd560;
             localparam [9:0] SPAWN_Y = 10'd10;
             localparam [1:0] SPAWN_D = 2'b01;                 // 朝下
+
+            // 兵种跟着出生点走：左边那辆是轻快的快速坦克、中间火力、右边装甲。
+            // 这样三张图在同一屏里一定都能看到（不用等随机数），也方便上板对照。
+            localparam [1:0] MY_TYPE = (gi == 0) ? T_FAST :
+                                       (gi == 1) ? T_POWER : T_ARMOR;
+
+            // ---------------- 兵种差异（玩法核心）----------------
+            //   快速 T_FAST  : 和玩家同速（STEP = 玩家节拍）、1 发碎、每 6 拍一炮
+            //   火力 T_POWER : 玩家的一半速度、1 发碎、每 4 拍一炮（弹幕最密）
+            //   装甲 T_ARMOR : 玩家的 1/3 速度、要挨 2 发、每 8 拍一炮
+            // top 传进来的 MOVE_DIV 是“中间档”（玩家的 2 倍），所以：
+            //   fast = MOVE_DIV/2（8M -> 25Hz，和玩家一样）
+            //   power= MOVE_DIV  （8M -> 12.5Hz）
+            //   armor= MOVE_DIV*3/2（12M -> 8.3Hz）
+            // 开火周期用“自己的移动节拍”计数，所以仿真里把 MOVE_DIV 改小之后
+            // 开火频率会跟着一起变快，用例不用另调参数。
+            localparam [23:0] STEP = (MY_TYPE == T_FAST)  ? (MOVE_DIV >> 1) :
+                                     (MY_TYPE == T_POWER) ? MOVE_DIV :
+                                                            (MOVE_DIV + (MOVE_DIV >> 1));
+            localparam [3:0]  FIRE_PERIOD = (MY_TYPE == T_FAST)  ? (FIRE_TICKS + 4'd2) :
+                                            (MY_TYPE == T_POWER) ? FIRE_TICKS :
+                                                                   (FIRE_TICKS * 4'd2);
+            localparam [1:0]  HP_MAX = (MY_TYPE == T_ARMOR) ? 2'd2 : 2'd1;
+
             // 相位错开：第一次节拍发生在 STEP-PHASE 拍之后，所以 PHASE 要取小值
             // （<= STEP-150）：复位后先留 ~150 拍让 4 个 terrain_probe 各扫一遍，
             // 再让几辆车错开 1/4N 个节拍开始走，避免同一时刻抢同一条地图总线。
@@ -90,6 +132,10 @@ module enemy_ctrl #(
             reg [23:0] cnt;
             reg [15:0] rnd;
             reg [7:0]  turn_cnt;
+            reg [3:0]  fire_cnt;      // 开火周期计数（按自己的移动节拍）
+            reg [1:0]  hp;            // 血量：装甲 2，其它 1
+            reg        fire_req;      // 单拍开火请求
+            reg        kill_req;      // 单拍击毁脉冲
 
             wire tick = (cnt == STEP - 24'd1);
             assign tick_all[gi] = tick;
@@ -98,6 +144,9 @@ module enemy_ctrl #(
             assign e_x[gi*10 +: 10]  = x;
             assign e_y[gi*10 +: 10]  = y;
             assign e_dir[gi*2  +: 2] = dir;
+            assign e_type[gi*2 +: 2] = MY_TYPE;
+            assign e_fire[gi]        = fire_req;
+            assign e_kill[gi]        = kill_req;
 
             // 上电初值（Vivado 会写进触发器的 INIT 属性，xsim 里同样生效）：
             // 即使板上的 reset 没正常触发，敌人也会出现在出生点而不是 (0,0)。
@@ -109,8 +158,11 @@ module enemy_ctrl #(
                 cnt      = PHASE;
                 rnd      = 16'h1ACE + gi[15:0];
                 turn_cnt = 8'd0;
+                fire_cnt = 4'd0;
+                hp       = HP_MAX;
+                fire_req = 1'b0;
+                kill_req = 1'b0;
             end
-
             always @(posedge clock) begin
                 if (reset) begin
                     x        <= SPAWN_X;
@@ -120,15 +172,45 @@ module enemy_ctrl #(
                     cnt      <= PHASE;
                     rnd      <= 16'h1ACE + gi[15:0];
                     turn_cnt <= 8'd0;
+                    fire_cnt <= 4'd0;
+                    hp       <= HP_MAX;
+                    fire_req <= 1'b0;
+                    kill_req <= 1'b0;
                 end else begin
+                    fire_req <= 1'b0;      // 两个都是单拍脉冲
+                    kill_req <= 1'b0;
+
                     // 16 位 LFSR（x^16 + x^14 + x^13 + x^11 + 1，最大长度序列）。
                     // 每拍走一步，换向时取里面不同的低位：不可预测但完全可复现。
                     rnd <= {rnd[14:0], rnd[15] ^ rnd[13] ^ rnd[12] ^ rnd[10]};
 
+                    // ---------------- 挨打：先扣血，血光才死 ----------------
+                    // 装甲坦克要两发（第一发只掉血，车身不变），其它一发就碎。
+                    // 击毁脉冲给 top 加分；alive 一清 0，VGA 那边这辆车就消失了。
+                    if (e_hit[gi] && alive && !freeze) begin
+                        if (hp > 2'd1) begin
+                            hp <= hp - 2'd1;
+                        end else begin
+                            hp       <= 2'd0;
+                            alive    <= 1'b0;
+                            kill_req <= 1'b1;
+                        end
+                    end
+
                     if (tick) cnt <= 24'd0;
                     else      cnt <= cnt + 24'd1;
 
-                    if (tick && alive) begin
+                    if (tick && alive && !freeze) begin
+                        // ---------------- 开火：每 FIRE_PERIOD 个节拍请求一发 ----------------
+                        // 这里只发“请求”，真正的池分配/冷却/同屏 1 发限制都在
+                        // bullet_ctrl 里统一做（它还要同时管玩家的炮弹）。
+                        if (fire_cnt >= FIRE_PERIOD - 4'd1) begin
+                            fire_cnt <= 4'd0;
+                            fire_req <= 1'b1;
+                        end else begin
+                            fire_cnt <= fire_cnt + 4'd1;
+                        end
+
                         // 巡逻计时：到点后由 LFSR 决定要不要拐一下
                         if (turn_cnt >= TURN_TICKS - 1) turn_cnt <= 8'd0;
                         else                            turn_cnt <= turn_cnt + 8'd1;

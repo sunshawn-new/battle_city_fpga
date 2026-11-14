@@ -13,6 +13,49 @@ set out  "$root/sim/build_report.txt"
 
 open_project "$root/battle_city_fpga.xpr"
 
+# ---- 新增的 RTL 源文件（HUD 相关）：工程里没有就加进去 ----
+# 幂等：重复运行不会重复添加。hud.v / font5x7.v 是 600x600 + 侧栏那一版加的，
+# 老工程文件（.xpr）里没有它们，综合会报 "module 'hud' not found"。
+set src_dir "$root/battle_city_fpga.srcs/sources_1/new"
+foreach f {hud.v font5x7.v fx_ctrl.v} {
+    set p "$src_dir/$f"
+    if {[llength [get_files -quiet $p]] == 0} {
+        puts "=== add source: $f ==="
+        add_files -norecurse -fileset sources_1 $p
+    }
+}
+update_compile_order -fileset sources_1
+
+# ---- 新增的贴图 ROM IP（爆炸动画两帧）：工程里没有就现场创建 ----
+# 幂等：已经有同名 IP 就跳过。参数和 blk_mem_tank_* 完全一致
+# （512x16 单口 ROM、1 拍读延迟、coe 指向工程根目录的 *_16bit.coe），
+# 这样 vga.v 里两个实例的接口（clka/addra[8:0]/douta[15:0]）和坦克 ROM 一模一样。
+foreach {ipn coef} [list blk_mem_tank_destroyed1 tank_destroyed1_16bit.coe \
+                         blk_mem_tank_destroyed2 tank_destroyed2_16bit.coe] {
+    if {[llength [get_ips -quiet $ipn]] != 0} {
+        puts "=== IP exists: $ipn ==="
+        continue
+    }
+    puts "=== create IP: $ipn ==="
+    create_ip -name blk_mem_gen -vendor xilinx.com -library ip -version 8.4 -module_name $ipn
+    set_property -dict [list \
+        CONFIG.Memory_Type {Single_Port_ROM} \
+        CONFIG.Write_Width_A {16} \
+        CONFIG.Write_Depth_A {512} \
+        CONFIG.Read_Width_A {16} \
+        CONFIG.Write_Width_B {16} \
+        CONFIG.Read_Width_B {16} \
+        CONFIG.Operating_Mode_A {WRITE_FIRST} \
+        CONFIG.Register_PortA_Output_of_Memory_Primitives {true} \
+        CONFIG.Load_Init_File {true} \
+        CONFIG.Coe_File "../../../../$coef" \
+        CONFIG.Fill_Remaining_Memory_Locations {false} \
+        CONFIG.Enable_A {Always_Enabled} \
+        CONFIG.Enable_B {Always_Enabled} \
+    ] [get_ips $ipn]
+}
+update_compile_order -fileset sources_1
+
 # ---- 贴图颜色是 IP 的 .coe 决定的：先让所有 blk_mem_* 重新读一遍 coe ----
 # 只改根目录的 *_16bit.coe 而不重新 generate_target，综合会用 IP 目录里的旧数据
 # （上一版就因为这样，改完颜色上板还是老样子）。
@@ -35,8 +78,32 @@ update_compile_order -fileset sources_1
 # OOC（GENERATE_SYNTH_CHECKPOINT=1）的 IP 更麻烦：顶层综合用的是它综合出来的 .dcp，
 # 那个 .dcp 的文件条目被 reset_target 删掉之后，综合阶段会直接报 module not found。
 # 这里把它的 OOC 综合补跑一遍，并把 .dcp 重新挂回 sources_1。
-foreach n {blk_mem_bullet blk_mem_headquarters} {
-    if {[llength [get_ips -quiet $n]] == 0} { continue }
+#
+# 【2026-11-14 的坑】只按 PROGRESS != 100% 判断是不够的：OOC run 只要跑过一次就
+# 一直是 100%，重新 generate_target 出新的 .mif 也不会把它标脏。于是“改了
+# headquarters_16bit.coe 但板上还是旧鹰”——顶层链接的是 11/13 那份旧 .dcp。
+# 所以先按时间戳判新旧：IP 的 Coe_File 比它的 .dcp 新，就把这个 run 重置掉，
+# 交给下面的循环重新综合。
+foreach ip [get_ips -quiet] {
+    set n [get_property NAME $ip]
+    set stale_run "${n}_synth_1"
+    if {[llength [get_runs -quiet $stale_run]] == 0} { continue }
+    set stale_dcp "$root/battle_city_fpga.runs/$stale_run/$n.dcp"
+    set coe_rel [get_property CONFIG.Coe_File $ip]
+    if {$coe_rel eq ""} { continue }
+    set coe_abs [file normalize "$root/battle_city_fpga.srcs/sources_1/ip/$n/$coe_rel"]
+    if {![file exists $coe_abs]} {
+        puts "WARNING: $n coe not found: $coe_abs"
+        continue
+    }
+    if {![file exists $stale_dcp] || ([file mtime $coe_abs] > [file mtime $stale_dcp])} {
+        puts "=== OOC stale: $stale_run (coe newer than dcp) -> reset_run ==="
+        reset_run $stale_run
+    }
+}
+
+foreach ip [get_ips -quiet] {
+    set n [get_property NAME $ip]
     set ipf [get_files -quiet "$root/battle_city_fpga.srcs/sources_1/ip/$n/$n.xci"]
     if {[llength $ipf] == 0} { continue }
     # 注意：GENERATE_SYNTH_CHECKPOINT 只能在 .xci 的 file 对象上问，问 IP 对象会告警
@@ -60,6 +127,28 @@ foreach n {blk_mem_bullet blk_mem_headquarters} {
     }
 }
 update_compile_order -fileset sources_1
+
+# 最后再核一遍：任何 OOC IP 的 .dcp 比它的 Coe_File 旧，就说明贴图没进比特流，
+# 直接让构建失败（这种错误在板子上只表现为“贴图没变”，极难发现）。
+set stale_errs 0
+foreach ip [get_ips -quiet] {
+    set n [get_property NAME $ip]
+    set chk_run "${n}_synth_1"
+    if {[llength [get_runs -quiet $chk_run]] == 0} { continue }
+    set chk_dcp "$root/battle_city_fpga.runs/$chk_run/$n.dcp"
+    set coe_rel [get_property CONFIG.Coe_File $ip]
+    if {$coe_rel eq ""} { continue }
+    set coe_abs [file normalize "$root/battle_city_fpga.srcs/sources_1/ip/$n/$coe_rel"]
+    if {![file exists $chk_dcp] || ([file mtime $coe_abs] > [file mtime $chk_dcp])} {
+        puts "ERROR: $n 的 .dcp 比 coe 旧，贴图不会进比特流"
+        incr stale_errs
+    } else {
+        puts "=== OOC fresh: $n ==="
+    }
+}
+if {$stale_errs > 0} {
+    error "$stale_errs 个 OOC IP 的 .dcp 仍是旧的（见上面 ERROR）"
+}
 
 reset_run synth_1
 launch_runs synth_1 -jobs 8

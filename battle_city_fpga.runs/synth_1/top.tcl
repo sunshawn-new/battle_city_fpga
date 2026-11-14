@@ -94,13 +94,30 @@ add_files E:/college_studies/semester202609/battle_city_fpga/tank_16bit.coe
 add_files E:/college_studies/semester202609/battle_city_fpga/steel_16bit.coe
 add_files E:/college_studies/semester202609/battle_city_fpga/bullet_16bit.coe
 add_files E:/college_studies/semester202609/battle_city_fpga/headquarters_16bit.coe
+add_files E:/college_studies/semester202609/battle_city_fpga/tank_fast_16bit.coe
+add_files E:/college_studies/semester202609/battle_city_fpga/tank_power_16bit.coe
+add_files E:/college_studies/semester202609/battle_city_fpga/tank_armor_16bit.coe
+add_files E:/college_studies/semester202609/battle_city_fpga/headquarters_destroyed_16bit.coe
+add_files e:/college_studies/semester202609/battle_city_fpga/tank_destroyed1_16bit.coe
+add_files e:/college_studies/semester202609/battle_city_fpga/tank_destroyed2_16bit.coe
 add_files -quiet E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.runs/blk_mem_bullet_synth_1/blk_mem_bullet.dcp
 set_property used_in_implementation false [get_files E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.runs/blk_mem_bullet_synth_1/blk_mem_bullet.dcp]
+add_files -quiet E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.runs/blk_mem_hq_destroyed_synth_1/blk_mem_hq_destroyed.dcp
+set_property used_in_implementation false [get_files E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.runs/blk_mem_hq_destroyed_synth_1/blk_mem_hq_destroyed.dcp]
 add_files -quiet E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.runs/blk_mem_headquarters_synth_1/blk_mem_headquarters.dcp
 set_property used_in_implementation false [get_files E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.runs/blk_mem_headquarters_synth_1/blk_mem_headquarters.dcp]
+add_files -quiet E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.runs/blk_mem_tank_armor_synth_1/blk_mem_tank_armor.dcp
+set_property used_in_implementation false [get_files E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.runs/blk_mem_tank_armor_synth_1/blk_mem_tank_armor.dcp]
+add_files -quiet E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.runs/blk_mem_tank_power_synth_1/blk_mem_tank_power.dcp
+set_property used_in_implementation false [get_files E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.runs/blk_mem_tank_power_synth_1/blk_mem_tank_power.dcp]
+add_files -quiet E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.runs/blk_mem_tank_fast_synth_1/blk_mem_tank_fast.dcp
+set_property used_in_implementation false [get_files E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.runs/blk_mem_tank_fast_synth_1/blk_mem_tank_fast.dcp]
 read_verilog -library xil_defaultlib {
   E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.srcs/sources_1/new/bullet-ctrl.v
   E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.srcs/sources_1/new/enemy_ctrl.v
+  E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.srcs/sources_1/new/font5x7.v
+  E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.srcs/sources_1/new/fx_ctrl.v
+  E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.srcs/sources_1/new/hud.v
   E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.srcs/sources_1/new/map_bus.v
   E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.srcs/sources_1/new/player.v
   E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.srcs/sources_1/new/terrain_probe.v
@@ -124,6 +141,12 @@ set_property used_in_implementation false [get_files -all e:/college_studies/sem
 
 read_ip -quiet E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.srcs/sources_1/ip/blk_mem_brick/blk_mem_brick.xci
 set_property used_in_implementation false [get_files -all e:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.gen/sources_1/ip/blk_mem_brick/blk_mem_brick_ooc.xdc]
+
+read_ip -quiet e:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.srcs/sources_1/ip/blk_mem_tank_destroyed1/blk_mem_tank_destroyed1.xci
+set_property used_in_implementation false [get_files -all e:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.gen/sources_1/ip/blk_mem_tank_destroyed1/blk_mem_tank_destroyed1_ooc.xdc]
+
+read_ip -quiet e:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.srcs/sources_1/ip/blk_mem_tank_destroyed2/blk_mem_tank_destroyed2.xci
+set_property used_in_implementation false [get_files -all e:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.gen/sources_1/ip/blk_mem_tank_destroyed2/blk_mem_tank_destroyed2_ooc.xdc]
 
 OPTRACE "Adding files" END { }
 # Mark all dcp files as not used in implementation to prevent them from being

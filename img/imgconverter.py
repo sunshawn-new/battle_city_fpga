@@ -17,6 +17,14 @@ TILES = {
     'tank': 'tank',
     'woods': 'woods',
     'bullet1': 'bullet',
+    # 兵种 / 基地 / 爆炸：由 img/sprites.py 用 ASCII 画稿生成的 png，
+    # png 名和 coe 前缀一致（新增的都是 1:1，不用像 bullet1 那样特例处理）。
+    'tank_fast': 'tank_fast',
+    'tank_power': 'tank_power',
+    'tank_armor': 'tank_armor',
+    'tank_destroyed1': 'tank_destroyed1',
+    'tank_destroyed2': 'tank_destroyed2',
+    'headquarters_destroyed': 'headquarters_destroyed',
 }
 # 逐贴图调色板重映射
 #   配色统一往 FC 原版 Battle City 靠：砖=砖红块 + 近黑灰缝、钢=浅灰钢板、
@@ -57,9 +65,52 @@ RECOLOR = {
         (0, 38, 255):    (0, 88, 248),     # 水面 #0058F8
         (255, 255, 255): (60, 188, 252),   # 浪花 #3CBCFC
     },
-    # 基地：png 是单色金鹰剪影，压成原版的金黄 #FCD800。
+    # 基地（存活）：重画成“金身 + 铜暗部 + 褐描边”的鹰。
+    # 描边故意用 #553300 而不是近黑：基地那 20x20 的底就是纯黑，
+    # 黑描边会直接消失（翅膀/头会和背景糊成一片）。
     'headquarters': {
-        (255, 239, 71): (252, 216, 0),
+        (160, 160, 160): (255, 221, 0),    # 鹰身 #FFDD00
+        (64, 64, 64):    (170, 102, 0),    # 胸羽暗部/翼羽 #AA6600
+        (0, 0, 0):       (85, 51, 0),      # 描边 #553300
+    },
+    # 基地（被摧毁）：白旗 + 断杆 + 碎石。原版就是白虎旗。
+    'headquarters_destroyed': {
+        (160, 160, 160): (255, 255, 255),  # 旗面 #FFFFFF
+        (64, 64, 64):    (187, 187, 187),  # 旗杆 #BBBBBB
+        (0, 0, 0):       (119, 119, 119),  # 碎石 #777777
+    },
+    # 快速坦克：淡青车身 + 深青暗部（和玩家坦克同一套“亮车身 + 同色系暗部”
+    # 的明度关系，只是把金色换成青色），1px 细炮管 + 3px 窄履带，一眼就是“轻甲快车”。
+    'tank_fast': {
+        (160, 160, 160): (136, 221, 255),  # 车身/履带面 #88DDFF
+        (64, 64, 64):    (0, 119, 170),    # 炮管/炮盾/暗部 #0077AA
+        (0, 0, 0):       (17, 17, 51),     # 描边/履带齿/舱口 #111133
+    },
+    # 火力坦克：暗履带 + 亮橙车身（和玩家反相），2px 炮管带 4px 炮口制退器，
+    # 暗色炮盾连成一整块，是“炮最粗、甲中等”的一档。
+    'tank_power': {
+        (160, 160, 160): (255, 136, 0),    # 车身/履带面 #FF8800
+        (64, 64, 64):    (170, 68, 0),     # 炮管/炮盾/暗部 #AA4400
+        (0, 0, 0):       (51, 34, 0),      # 描边/履带齿/舱口 #332200
+    },
+    # 装甲坦克：亮绿车身 + 深绿重甲板 + 近黑刻度。5px 宽厚履带（车体被挤到
+    # x5..14）+ 6px 炮口制退器，格子最满，最“重”。
+    'tank_armor': {
+        (160, 160, 160): (102, 221, 102),  # 车身/履带面 #66DD66
+        (64, 64, 64):    (0, 136, 0),      # 炮管/重甲板/暗部 #008800
+        (0, 0, 0):       (17, 51, 17),     # 描边/履带齿/舱口 #113311
+    },
+    # 坦克爆炸：两帧共用一张调色板。帧1 = 白核 + 黄焰 + 橙边（命中瞬间），
+    # 帧2 = 同一组颜色画的扩散破环（余烬），RTL 里两帧交替闪即可。
+    'tank_destroyed1': {
+        (160, 160, 160): (255, 255, 255),  # 爆心 #FFFFFF
+        (255, 239, 71):  (255, 221, 0),    # 焰身 #FFDD00
+        (200, 76, 12):   (204, 68, 0),     # 焰边/余烬 #CC4400
+    },
+    'tank_destroyed2': {
+        (160, 160, 160): (255, 255, 255),  # 爆心 #FFFFFF
+        (255, 239, 71):  (255, 221, 0),    # 焰身 #FFDD00
+        (200, 76, 12):   (204, 68, 0),     # 焰边/余烬 #CC4400
     },
     # 炮弹：png 是中灰圆头弹。黑底上中灰量化后发暗，提成白色最清楚（原版也是白弹）。
     # 注意 key 用 png 名 bullet1（TILES 里 bullet1 -> bullet_16bit.coe）。
@@ -69,46 +120,52 @@ RECOLOR = {
 }
 
 # 坦克 / 砖块 20x20，炮弹 10x10；脚本对尺寸不敏感
-for i in TILES:
-    img = Image.open(IMG_DIR / '{0}.png'.format(i)).convert('RGBA')
-    WIDTH, HEIGHT = img.size
+def main():
+    """把 TILES 里的 png 全部转成 *_16bit.coe（img/ 下的 png -> 工程根目录）"""
+    for i in TILES:
+        img = Image.open(IMG_DIR / '{0}.png'.format(i)).convert('RGBA')
+        WIDTH, HEIGHT = img.size
 
-    with (OUT_DIR / '{0}_16bit.coe'.format(TILES[i])).open('w') as f:
-        f.write('memory_initialization_radix = 16;\n')
-        f.write('memory_initialization_vector =\n')
-        
-        total = WIDTH * HEIGHT
-        count = 0
-        
-        for y in range(HEIGHT):
-            for x in range(WIDTH):
-                r, g, b, a = img.getpixel((x, y))
+        with (OUT_DIR / '{0}_16bit.coe'.format(TILES[i])).open('w') as f:
+            f.write('memory_initialization_radix = 16;\n')
+            f.write('memory_initialization_vector =\n')
 
-                # 先按原画颜色查重映射表（透明像素不动，保持最高位 0）
-                if a >= 128 and i in RECOLOR:
-                    r, g, b = RECOLOR[i].get((r, g, b), (r, g, b))
-                
-                # 提取高 4 位 (除以 16)
-                r4 = r >> 4
-                g4 = g >> 4
-                b4 = b >> 4
-                
-                # 判断是否透明 (Alpha < 128 视为透明)
-                if a < 128:
-                    # 透明：最高位设为 0，后面全 0
-                    val = 0x0000
-                else:
-                    # 不透明：最高位设为 1 (0x8000)，拼接 12 位色彩
-                    # 格式: 1000_RRRR_GGGG_BBBB
-                    val = 0x8000 | (r4 << 8) | (g4 << 4) | b4
-                
-                f.write(f'{val:04X}')
-                count += 1
-                if count == total:
-                    f.write(';\n')
-                else:
-                    f.write(',\n')
-    print('{0}.png ({1}x{2}) -> {3}_16bit.coe，共 {4} 项'.format(
-        i, WIDTH, HEIGHT, TILES[i], total))
+            total = WIDTH * HEIGHT
+            count = 0
 
-print('16-bit COE 生成完毕！')
+            for y in range(HEIGHT):
+                for x in range(WIDTH):
+                    r, g, b, a = img.getpixel((x, y))
+
+                    # 先按原画颜色查重映射表（透明像素不动，保持最高位 0）
+                    if a >= 128 and i in RECOLOR:
+                        r, g, b = RECOLOR[i].get((r, g, b), (r, g, b))
+
+                    # 提取高 4 位 (除以 16)
+                    r4 = r >> 4
+                    g4 = g >> 4
+                    b4 = b >> 4
+
+                    # 判断是否透明 (Alpha < 128 视为透明)
+                    if a < 128:
+                        # 透明：最高位设为 0，后面全 0
+                        val = 0x0000
+                    else:
+                        # 不透明：最高位设为 1 (0x8000)，拼接 12 位色彩
+                        # 格式: 1000_RRRR_GGGG_BBBB
+                        val = 0x8000 | (r4 << 8) | (g4 << 4) | b4
+
+                    f.write(f'{val:04X}')
+                    count += 1
+                    if count == total:
+                        f.write(';\n')
+                    else:
+                        f.write(',\n')
+        print('{0}.png ({1}x{2}) -> {3}_16bit.coe，共 {4} 项'.format(
+            i, WIDTH, HEIGHT, TILES[i], total))
+
+    print('16-bit COE 生成完毕！')
+
+
+if __name__ == '__main__':
+    main()

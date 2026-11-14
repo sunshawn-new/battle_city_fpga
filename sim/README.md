@@ -7,15 +7,20 @@
 
 | 文件 | 作用 |
 | --- | --- |
-| `tb_terrain.v` | 地形测试台：19 条断言，覆盖四方向移动、砖/钢/河/树林/基地/切角/桥、**坐标永远在 5px 格点上** |
-| `tb_bullet.v` | 炮弹测试台：66 条断言，覆盖发射/冷却/飞行/命中/打砖洞（20x10）/出界/对象池/总线仲裁/贴墙开火/连续打洞 |
-| `tb_enemy.v` | 敌方坦克测试台：30 条断言，覆盖出生点/整格移动/三个 probe 不串台/撞墙转向/4 客户端抢总线/长跑不压墙 |
-| `bram_stubs.v` | `blk_mem_gen_0`（地图）和 7 个贴图 ROM（含 `blk_mem_bullet` / `blk_mem_headquarters`）的行为级模型 |
+| `tb_terrain.v` | 地形测试台：24 条断言，覆盖四方向移动、砖/钢/河/树林/基地/切角/河与浅滩、**坐标永远在 5px 格点上**、以及**地图契约**（基地本体 8x6 必须正好在格 (56,112)、出生点净空） |
+| `tb_bullet.v` | 炮弹测试台：88 条断言，覆盖发射/冷却/飞行/命中/打砖洞（20x10）/出界/对象池/总线仲裁/贴墙开火/连续打洞/打中基地（`base_hit` 单拍），以及本轮新增的**敌人开火 / 打中坦克 / 友军不误伤 / 弹对弹同归于尽 / 每发射者同屏 1 发 / GAME OVER 冻结** |
+| `tb_enemy.v` | 敌方坦克测试台：38 条断言，覆盖出生点/兵种（`e_type`）/整格移动/三个 probe 不串台/撞墙转向/4 客户端抢总线/长跑不压墙，以及**兵种速度（200/400/600 拍）、开火周期（6/4/8 节拍）、装甲挨两发、击毁脉冲、GAME OVER 冻结** |
+| `tb_combat.v` | 关卡流程测试台：28 条断言，覆盖生命 3→0、复活回出生点、复活无敌、命耗尽/基地被打爆 -> GAME OVER、分数 100/200/300、敌人全灭 -> VICTORY，以及**击毁 -> 爆炸开在坦克位置 / 6 个相位后自动释放**、**玩家中弹 -> 爆炸开在死亡位置（不是复活点）** |
+| `tb_hud.v` | 侧栏测试台：34 条断言，覆盖 x=600 边界、面板底色/2px 分界线、标题/关卡/标签字形真的画出来、**字形 2 倍放大的亮/暗像素**、分数/生命数字随状态变化、敌人图标的位置/兵种、GAME OVER / VICTORY 横幅，以及**爆炸图层的包围盒/ROM 地址/帧选择**（H13） |
+| `tb_fx.v` | 爆炸特效测试台：30 条断言，覆盖 4 个槽的**同拍多请求分配**（3 敌 + 玩家全死不丢帧）、坐标绑定、6 个相位的**两帧切换点**（相位 2/3 边界）、**满池丢弃**（不覆盖正在放的爆炸）、放完自动释放 + 复用、放到一半复位、两个槽相位互不干扰 |
+| `bram_stubs.v` | `blk_mem_gen_0`（地图）和 12 个贴图 ROM（含 `blk_mem_bullet` / `blk_mem_headquarters` / 3 种兵种 / `blk_mem_hq_destroyed` / 爆炸两帧 `blk_mem_tank_destroyed1|2`）的行为级模型 |
 | `run_sim.ps1` | 一键跑仿真：转换地图、用 4 种 BRAM 读延迟各编译运行三套用例 |
 | `build_all.tcl` | 用工程流重新 synth + impl + 生成 bit，并把报告写到 `build_report.txt` |
 | `add_bullet_ip.tcl` | 一次性脚本：把 `terrain_probe.v`/`map_bus.v` 和 `blk_mem_bullet` IP 并进工程 |
 | `add_hq_ip.tcl` | 一次性脚本：新建 `blk_mem_headquarters` IP，并让坦克 ROM 重新读新的金色 coe |
 | `add_enemy_ctrl.tcl` | 一次性脚本：把 `enemy_ctrl.v` 并进工程 |
+| `add_tank_types_ip.tcl` | 一次性脚本：新建 4 个 ROM IP（`blk_mem_tank_fast/power/armor`、`blk_mem_hq_destroyed`）并挂进 `sources_1` |
+| `_run_build.ps1` / `_run_one.ps1` / `_quick.ps1` | 临时：后台跑一次完整构建 / 单个测试台 / 转地图+单个测试台（命令行有 30s 超时，长任务只能这样跑） |
 | `probe_ckpt.tcl` / `probe2_ckpt.tcl` | 排查用的一次性脚本（在已布线的 dcp 上查网表/时钟） |
 
 ## 炮弹系统（bullet_ctrl + map_bus + vga 图层）
@@ -39,7 +44,9 @@
   炮弹正好压在 **2x2 格**上，所以判定 = 「弹体压着的 4 格里有任何一格是砖吗」，
   而不是只看弹心那一个像素所在的格。只有这 4 格的组合变了才去读 BRAM
   （`last_cell[]` 存 `{box_cx, box_cy}` 去重）。
-  砖块 → 写 0 打掉 4 格宽 x 2 格深的洞；钢/河/基地 → 消失；空地/树林 → 穿过。
+  砖块 → 写 0 打掉 4 格宽 x 2 格深的洞；钢/河 → 消失；
+  基地 → 消失 + 单拍 `base_hit` 脉冲（`top` 锁存后基地变废墟，见下面“基地”一节）；
+  空地/树林 → 穿过。
 * **生成当拍也立刻扫一次**：贴着砖墙开火时弹体的下半截就压在砖里（炮口坐标 =
   坦克上边 - 10），必须当拍判掉，否则子弹会从砖里“穿”出去。
 * **打砖洞 = 20x10 像素，和坦克的脚下一格不差**：炮口在坦克正中的那条边上，
@@ -62,8 +69,8 @@
  btn_fire     ──► bullet_ctrl     ──┘
  
  enemy_ctrl ◄── terrain_front[4N] / terrain_valid[N]   （每车一份）
-      │ e_valid / e_x / e_y / e_dir
-      └──────► vga（坦克图层 = 玩家 + N_E 个敌人，共用同一张 tank 贴图 ROM）
+      │ e_valid / e_x / e_y / e_dir / e_type
+      └──────► vga（坦克图层 = 玩家 + N_E 个敌人，各自选自己的贴图 ROM）
 ```
 
 * **和玩家同一条不变量**：每个移动节拍走一整格（TILE = 5 像素），坐标永远是
@@ -76,14 +83,118 @@
   LFSR 决定，另有 1/4 概率直接掉头 —— 掉头方向刚走过、一定通，这是
   “贴着墙来回滑出不来”的保底出口）；每 `TURN_TICKS` 拍再随机拐一下，
   看起来像在巡逻而不是一条直线机器人。
-* **渲染**：玩家和敌人共用 `blk_mem_player_tank`，地址做 mux（重叠时玩家优先）。
-  敌人像素用 `vga.v` 里的 `enemy_tint()` 换成灰色 —— 贴图只有 3 种不透明色
-  （`0xFD3` 车体 / `0xA60` 暗部 / `0x310` 描边），三个比较器就够了，
-  不必再做一个敌人专用的 ROM/IP。**以后换 tank.png 的配色要同步这三个常量**，
-  否则敌人会重新变回黄色。
+* **渲染**：坦克地址仍然只有一份（`tank_addr_mux`，重叠时玩家优先），但像素来自
+  4 个 ROM —— `blk_mem_player_tank` + `blk_mem_tank_fast/power/armor`。
+  兵种是 `enemy_ctrl` 的常量输出 `e_type`（每位 2 bit），`vga` 在“出像素”那层
+  按 `tank_type_sel_d1` 选一张。旧的 `enemy_tint()` 三个换色常量已经删了。
 * **还没做**（下一步）：坦克互斥、炮弹打敌人、敌人开火、被击毁/复活、分波次出生。
+  兵种现在只差“贴图以外的差异”：三辆车共用同一套移动节拍/AI，速度和血量还没分开
+  （要加的话从 `enemy_ctrl` 的 `MY_TYPE` 旁边再引一对 `e_speed/e_hp` 就行，VGA 不用动）。
   `e_valid` 已经是“每位一车”（`enemy_ctrl` 里的 `alive` 寄存器），
   以后被打中就把对应位清 0，VGA 立刻不画它、它的 probe 也不再抢总线。
+
+## 兵种贴图 + 基地可被摧毁
+
+### 三种敌人：`e_type` + 4 个贴图 ROM
+
+```
+ enemy_ctrl                       vga
+  gi=0 -> T_FAST  (00) ──┐    ┌── blk_mem_tank_fast   (tank_fast_16bit.coe)
+  gi=1 -> T_POWER (01) ──┼───►├── blk_mem_tank_power  (tank_power_16bit.coe)
+  gi=2 -> T_ARMOR (10) ──┘    ├── blk_mem_tank_armor  (tank_armor_16bit.coe)
+                              └── blk_mem_player_tank (tank_16bit.coe)
+      e_type[N_E*2] ─────────────► tank_type_sel -> 打一拍 -> 选像素
+```
+
+* 兵种按**出生点**分配（左=快速 / 中=火力 / 右=装甲），不用随机数：
+  三张图一上电就同屏可见，接没接对一眼就看出来（`tb_enemy` 的 E00h~j 也钉住了这点）。
+* 4 个 ROM 共用同一条地址 `tank_addr_mux`（旋转/翻转规则完全一样），地址逻辑不增加；
+  代价只是 4 份 512x16 单口 ROM（合起来 2 个 BRAM36）。
+* **时序**：`tank_on` / `tank_is_enemy` / `tank_type_sel` 一起打一拍，再拿打拍后的
+  兵种去 mux 本拍才从 `douta` 出来的像素 —— 正好对齐 ROM 的 1 拍读延迟，
+  坦克边缘不会闪出“邻居兵种”的颜色。
+* **CDC**：坐标/朝向/兵种这些信号都是 sys 域寄存器，vga 域只读。直接在 vga 域里
+  用它们的话，sys 域寄存器会经减法器、比较器一路打到 4 个坦克 ROM 的地址口，
+  时序报告里 `sys_clk_pin -> vga_clk` 那条最紧的路径（route 占 75%）就是它。
+  现在 `vga.v` 里先把 `position_x/y`、`player_direction`、`enemy_x/y/dir/valid/type`、
+  `bullet_x/y/dir/valid`、`hq_destroyed` 各打一拍（单级同步）再参与几何运算，
+  跨域只剩“FF -> FF”的走线，地址由 vga 域寄存器驱动。
+  这些量都是准静态的（位置 12.5~25Hz 更新、基地被打爆后永久不变），
+  所以画面不延迟：坐标最多晚 1 个 vga_clk（20ns，远小于 1 像素）被看到。
+* 新旧对比：以前是 `tank.png` + `enemy_tint()` 三个常量换灰（三辆车全灰，
+  换一次玩家配色就得同步常量）。现在是独立贴图，`vga.v` 里没有任何颜色常量。
+* `img/preview.py` 同步改了：敌人按 `ENEMIES` 里的兵种名取图，
+  所以 `img/preview.png` 和板子上看到的一致。
+
+### 基地：`base_hit` -> `base_alive` -> `hq_destroyed`
+
+```
+ bullet_ctrl: 读到 tile_id == 5 -> 炮弹消失 + base_hit（单拍）
+                                          │
+ top:  base_alive <= 1'b0（reset 置 1，打中后永久 0）  <- game-over 状态
+                                          │
+ vga:  hq_destroyed = ~base_alive -> 基地图层在两份 ROM 里二选一：
+         blk_mem_headquarters   金鹰（headquarters_16bit.coe）
+         blk_mem_hq_destroyed   白旗 + 断杆 + 碎石（headquarters_destroyed_16bit.coe）
+```
+
+* `base_hit` 做成**单拍脉冲**：手炮打中基地后炮弹当拍消失，但下一拍如果还有别的
+  炮弹压在基地上（贴脸连射），也不会把状态机再触发一遍；`top` 里的 `base_alive`
+  是唯一的系统状态，一次锁存到底（本工程没有“重开一局”）。
+* `T_BASE` 从“和钢/河共用一个分支”里拆出来，单独一个分支：其他不可通行格子是
+  “炮弹消失、地图不变”，基地是“炮弹消失、地图不变、`base_hit` 拉高一拍”。
+* 为什么不继续用换色：废墟不是“金鹰变灰”，而是白旗 + 断杆 + 碎石，形状都变了。
+  两张图都是 512x16、地址规则相同，所以 `vga.v` 里只是同一个 `hq_addr` 挂两个
+  ROM、出像素时按 `hq_destroyed_q` 二选一（同样先打一拍再进 mux，和坦克一致）。
+* 覆盖：`tb_bullet` 的 B19a~d（打中基地 → `base_hit` 恰好一拍、`b_valid` 清零、
+  地图里 `tile_id == 5` 不被改写、之后的炮弹仍然能打砖）；
+  `img/preview.py --hq-destroyed` 可以离线看废墟那一帧（`img/preview_destroyed.png`）。
+
+## 地图：关卡文件 -> `map.coe`
+
+地图是画出来的，不是手写的 19200 个数：
+
+```
+pysrc/maps/level1.txt   40 列 x 30 行 ASCII，一个字符 = 1 块
+        │               '.' 空  '#' 砖  'S' 钢  '~' 河  'T' 树  'H' 基地
+        │  python pysrc\map_generator.py
+        ▼
+map.coe                 160x120 格 = 19200 个 tile_id（16 进制）
+        │  build_all.tcl -> blk_mem_gen_0 的 .mif
+        ▼
+板上                     vga.v 每 5x5 像素读一次
+```
+
+坐标系（三套，别混）：
+
+| 单位 | 大小 | 换算 |
+| --- | --- | --- |
+| 像素 | 800x600 | 坦克 20x20、贴图 20x20 |
+| 格 | 160x120 | 1 格 = 5x5 像素；坦克 = 4x4 格 |
+| 块（关卡文件里一个字符） | 40x30 | 1 块 = 4x4 格 = 20x20 像素 |
+
+块 `(bx, by)` 覆盖格 `x = 4bx..4bx+3`、`y = 4by..4by+3`，即像素 `(20bx, 20by)` 起的
+20x20 方块 —— 墙厚正好一块，贴图不会被切断；炮弹打掉 20x10 刚好半块。
+
+`map_generator.py` 写 `map.coe` 之前会自己校验，不通过就退出、不留半成品：
+
+1. 基地本体必须**正好**是格 `列 76~83 x 行 112~117`（8x6）。因为 `vga.v` 的
+   `HQ_X0/HQ_Y0 = 390/565` 是按这个包围盒写死画精灵的；整张图不许有第二处 tile 5。
+2. 玩家出生点 `(400,300)` 及上下各 60px 的通道必须空（否则一开局就“空气墙”）。
+3. 三个敌人出生点 `(40,10)/(380,10)/(740,10)` 及其正下方 20px 必须空。
+4. 从玩家出生点 BFS：三个敌人出生点、基地堡垒左上/右上/上方都要能走到
+   （否则关卡是死的）。
+
+```powershell
+python pysrc\map_generator.py            # 校验并重写 map.coe
+python pysrc\map_generator.py --ascii    # 只在终端打印关卡，看对称/留白
+python img\preview.py                    # 渲染 img/preview.png 看实际画面
+```
+
+> **测试台不再绑定地图内容。** `tb_terrain` 分成两类用例：
+> 真地图契约（T15 基地 8x6 位置 + T16 出生点净空，改地图时依然必须成立）、
+> 以及“先 `clear_map` 再 `poke` 地形”的碰撞用例（T08~T12：砖/钢/河/树怎么挡）。
+> 改关卡只需要重跑 `run_sim.ps1`，不用改任何期望值。
 
 ## 跑仿真
 
@@ -98,13 +209,14 @@ cd sim
    加载 —— 仿真的就是板子里那张真地图，所以地形用例的期望值能和上板行为对上
    （`tb_bullet` 开始时会把整张地图清 0，自己 `poke` 需要的格子，与 `map.coe` 无关）。
 2. 用 `-d BRAM_LATENCY_0/2/3`（不加宏就是真 IP 的 1 拍）分别编译运行
-   `tb_terrain` / `tb_bullet` / `tb_enemy`。这样能证明 `map_bus` + 扫描引擎不依赖
-   BRAM 的具体读延迟（`xvlog` 在这个版本里不支持 `-d NAME=VALUE`，`=VALUE` 会被当成
-   文件名，所以用宏名来选值）。
-3. 打印 `PASSED/FAILED` 汇总；任何一个配置不是 19/19、66/66、30/30 全过就以退出码 1 结束。
+   `tb_terrain` / `tb_bullet` / `tb_enemy` / `tb_combat` / `tb_hud` / `tb_fx`。这样能证明
+   `map_bus` + 扫描引擎不依赖 BRAM 的具体读延迟（`xvlog` 在这个版本里不支持
+   `-d NAME=VALUE`，`=VALUE` 会被当成文件名，所以用宏名来选值）。
+3. 打印 `PASSED/FAILED` 汇总；任何一个配置不是 24/88/38/28/34/30 全过就以退出码 1 结束。
 
 仿真里参数都改小了以加速：`top` 的 `MOVE_DIV` = 200（板上 4_000_000）、
-`SPEED_DIV` = 64、`COOLDOWN` = 200、`DB_MAX` = 4。
+`SPEED_DIV` = 64、`COOLDOWN` = 200、`DB_MAX` = 4、`FX_DIV` = 8（板上 8_000_000，
+爆炸每个相位 80ms）。`tb_fx` 更直接：直接实例化 `fx_ctrl`，`FX_DIV` = 8。
 注意 `SPEED_DIV` 必须大于一次扫描的耗时（4 格 ≈ 28 拍），否则两次扫描会叠在
 一起，“没换格就不读地图”的去重就测不准。
 坦克仍然是【整格移动】：`tb_terrain` 的 `step_ticks(n)` 表示“走 n 像素”，
@@ -331,7 +443,8 @@ set_property PACKAGE_PIN G19 [get_ports {disp_RGB[8]}]    # vgaRed[0]   R0
 
 | 命令 | 输出 | 应该看到 |
 | --- | --- | --- |
-| `python img\preview.py` | `img/preview.png` | 砖红墙 + 近黑砖缝、深蓝河 + 浅蓝浪花、深绿树冠、黄坦克（玩家）、**三辆灰坦克**（敌人在 y=10 出生点）、金黄老鹰、白炮弹 |
+| `python img\preview.py` | `img/preview.png` | 砖红墙 + 近黑砖缝、深蓝河 + 浅蓝浪花、深绿树冠、黄坦克（玩家）、**三辆不同颜色的敌人**（快速淡青 / 火力亮橙 / 装甲深灰，y=10 出生点）、金黄老鹰、白炮弹 |
+| `python img\preview.py --hq-destroyed` | `img/preview_destroyed.png` | 同上，但基地换成白旗 + 断杆 + 碎石的废墟 |
 | `python img\preview.py --reversed` | `img/preview_reversed.png` | 位序反了的样子：砖体变暗橄榄 `#332200`、砖缝变亮红 `#CC0000`、水面偏青 `#00AAFF` |
 
 最终构建（2026-11-13 19:36）：WNS +0.385 ns / WHS +0.144 ns / TNS = THS = 0，
@@ -350,15 +463,398 @@ set_property PACKAGE_PIN G19 [get_ports {disp_RGB[8]}]    # vgaRed[0]   R0
 | --- | --- | --- |
 | 复位后不等开走就先自己动了一格 | `PHASE` 是计数器**初值**，第一次节拍发生在 `STEP-PHASE` 拍之后 —— 相位越大反而越早 | `PHASE = STEP/(4N) * gi`（≤ `STEP-150`），复位后先留够一拍让 4 个 probe 各扫一遍 |
 | 三辆车最后都贴着右墙上下滑，出不来 | 墙前转向只用了 `dir ^ 2'b10 / 2'b11`，这两个都是**垂直转向**：竖直 ↔ 水平，永远回不到“掉头” | 1/4 概率改用 `dir ^ 2'b01` 掉头 —— 掉头方向刚走过、一定通，是保底出口 |
-| 敌人变回黄色 / 颜色对不上 | `enemy_tint()` 是拿 `0xFD3 / 0xA60 / 0x310` 三个 12 位常量做比较的，和 `tank_16bit.coe` 的调色板硬绑定 | 换 `tank.png` 配色时同步这三个常量（README 敌方坦克一节也有提醒） |
+| 敌人变回黄色 / 颜色对不上 | `enemy_tint()` 是拿 `0xFD3 / 0xA60 / 0x310` 三个 12 位常量做比较的，和 `tank_16bit.coe` 的调色板硬绑定 | **已删掉 `enemy_tint()`**，改成 3 个独立兵种 ROM（`tank_fast/power/armor_16bit.coe`），`vga.v` 里不再有颜色常量（见“兵种贴图 + 基地可被摧毁”） |
 
-`tb_enemy`（30 条断言，4 种 BRAM 延迟各跑一遍）覆盖：
-出生点/朝向、每拍走整格、**三个 probe 同时扫同一块地图但读到各自的格子**、
+`tb_enemy`（33 条断言，4 种 BRAM 延迟各跑一遍）覆盖：
+出生点/朝向/**兵种 `e_type`**、每拍走整格、**三个 probe 同时扫同一块地图但读到各自的格子**、
 撞砖转身不进墙、玩家在 4 客户端抢总线时照常移动、连跑 60 拍后车身仍只压在可通行格上。
 
 最终构建（2026-11-13 20:19）：WNS +0.366 ns / WHS +0.153 ns / TNS = THS = 0，
 `battle_city_fpga.runs/impl_1/top.bit` 已重新生成。
 资源相对第三轮：LUT 956 → 1830、FF 429 → 890、DSP 10 → 34（4 个 probe 各自 6 个
 `div5` 乘法器）、BRAM 仍 7.5 tile。
-`python img\preview.py` 现在也会画三辆灰坦克（出生点 `40/380/740, y=10`，朝下），
-上板前可以先看构图。
+`python img\preview.py` 现在也会画三辆不同颜色的敌人（出生点 `40/380/740, y=10`，朝下），
+`--hq-destroyed` 还能看基地被打爆的那一帧，上板前可以先看构图。
+
+## 第五轮：兵种贴图 + 基地可被摧毁 + CDC 同步（2026-11-14）
+
+改动：`enemy_ctrl.v` 多一路 `e_type`（按出生点常量分配），`bullet-ctrl.v` 多一路单拍
+`base_hit`（`T_BASE` 单独一个分支），`top.v` 用 `base_alive` 锁存、`vga.v` 把基地/敌人
+贴图换成 4 个独立 ROM。三处连线：`enemy_ctrl -> top -> vga`（`enemy_type`）、
+`bullet_ctrl -> top -> vga`（`hq_destroyed = ~base_alive`）。
+
+**这次真正值得记的是时序**。加完 4 个坦克 ROM 之后第一次 impl：
+
+```
+WNS = +0.011 ns   (sys_clk_pin -> vga_clk)    ← 差点翻车
+Destination: u_vga/tank_rom/.../ADDRARDADDR[11]
+Data Path Delay: 12.006ns  (logic 2.965ns / route 9.041ns)
+```
+
+也就是“敌人的 y 坐标寄存器 → 减法器/比较器 → 4 个 ROM 的地址口”，一条
+**跨时钟域的准静态路径**：源端 12.5~25Hz 才动一次，却被当成每个 vga_clk（20ns）
+都要收敛的组合路径来修 —— 而它的走线占了 75%，布局稍微一动就会变负。
+
+修法（`vga.v`）：几何信号进 vga 域前先各打一拍 ——
+`position_x/y`、`player_direction`、`enemy_x/y/dir/valid/type`、
+`bullet_x/y/dir/valid`、`hq_destroyed`，一共 +116 个 FF。
+跨域变成“FF → FF”的纯走线，地址由 vga 域寄存器驱动；
+因为这些量都是准静态的，画面上看不出任何延迟（最多晚 1 个 vga_clk = 20ns）。
+
+```diff
++    reg [9:0]          position_x_q, position_y_q;
++    reg [N_E*10-1:0]   enemy_x_q, enemy_y_q;
++    ...
++    always @(posedge vga_clk) begin
++        position_x_q <= position_x;
++        enemy_y_q    <= enemy_y;
++        enemy_type_q <= enemy_type;
++        ...
++    end
+```
+
+最终构建（2026-11-14 14:35，`xc7a35tcpg236-1`）：
+
+```
+WNS = +1.528 ns   TNS = 0.000   WHS = +0.089 ns   THS = 0.000    (0 条违例)
+
+sys_clk_pin            : WNS +1.528 ns  (1875 endpoints)   PW 4.500 ns
+vga_clk (50 MHz, 2 分频) : WNS +6.097 ns  ( 322 endpoints)
+sys_clk_pin -> vga_clk : WNS +7.315 ns  ( 112 endpoints)   ← 修完之后
+vga_clk -> sys_clk_pin : WNS +8.228 ns  (  1 endpoint )
+
+Slice LUT 1837 / 20800 (8.8%)   FF 1006 (2.4%)   BRAM 9.5 tile / 50   DSP 34 / 90
+```
+
+资源相对第四轮：LUT 1830 → 1837（+7，兵种 mux 只是 2 位选择）、
+FF 890 → 1006（+116，就是上面那批同步寄存器）、
+BRAM 7.5 → 9.5（4 份 512x16 坦克 ROM + 1 份废墟 ROM）、DSP 仍 34。
+
+仿真：19/19、70/70、33/33，4 种 BRAM 读延迟（0/1/2/3 拍）全过，
+`battle_city_fpga.xpr` 里确认已挂上 4 个新 IP
+（`blk_mem_tank_fast/power/armor`、`blk_mem_hq_destroyed`，都有对应的 `*_synth_1`/`*_impl_1` run）。
+
+## 第六轮：关卡重做 + 测试台与地图解耦（2026-11-14）
+
+`pysrc/maps/level1.txt` 整张重画（仍然 40x30 块，左右镜像），
+主题是**一条横贯东西的河 + 两处浅滩**：
+
+| | 内容 |
+| --- | --- |
+| 河 | 第 8~9 块（像素 y=160~199），40px 宽，横贯整图 |
+| 浅滩 | 第 8~11 块、第 28~31 块（每处 4 块 = 80px），是全图仅有的过河通道 |
+| 主通道 | x=16~23 块（像素 320~479）从浅滩直通堡垒，正好罩住玩家出生点 (400,300) |
+| 掩体/埋伏 | 河下方左右各一组钢板（第 9~10、29~30 块）；树林在第 12~13、26~27 块和两角第 1~3、36~38 块（可钻、盖坦克） |
+| 堡垒 | 底部中央，顶盖 2 块高 + 两侧 1 块厚 + 2 行砖台座，正上方留 20x20 冲刺空间 |
+
+为什么这个形状“打得起来”：三个敌人出生点都在河北岸，落下来必须先挤过两处浅滩，
+玩家守在河南岸的纵深里；而浅滩两侧是钢板/砖房，所以关隘是**真关隘**，不是摆设。
+
+### 测试台不再绑定地图
+
+以前 `tb_terrain` 里写死了“第 (76,112) 格是砖”“第 (x,y) 格是河”，改一关就红一片。
+现在分成两类用例：
+
+| 用例 | 依赖地图？ | 做法 |
+| --- | --- | --- |
+| T06 河挡路 / T07 浅滩可过 / T13 基地屋顶挡路 | 是（故意） | 直接读 `map.coe` 的真值，验证“这张关卡真的能这么打” |
+| T08~T12 砖/钢/河/树怎么挡 | 否 | 先 `clear_map` 把 19200 格清零，再 `poke` 出需要的那几格（地址 = `row*160+col`） |
+| T15 基地本体 | 是（契约） | 基地必须**正好**是格 `列 76~83 x 行 112~117`（8x6），且全图只有这一处 `tile 5` |
+| T16 出生点净空 | 是（契约） | 玩家 (400,300) ±60px 走廊、三个敌人出生框 +20px 内必须全空 |
+
+```verilog
+task clear_map;                       // 19200 格全写 0，之后地图内容不再影响用例
+    begin
+        for (a = 0; a < 19200; a = a + 1) poke(a, 4'd0);
+    end
+endtask
+```
+
+于是“改关卡”这件事的代价从“改一堆期望值”变成“重跑一次 `run_sim.ps1`”：
+24/24、70/70、33/33 × 4 种 BRAM 读延迟（0/1/2/3 拍）全绿，`run_sim.ps1` 的
+阈值也改成了 `tb_terrain Min=24`。
+
+### 怎么证明“新地图真的进了比特流”
+
+`.coe` 改了不等于板子变了，中间还有一跳：IP 目录里的 `.mif`（由 `build_all.tcl` 的
+`generate_target` 重新生成），OOC 综合读的是它。所以加了个一次性校验脚本：
+
+```powershell
+python pysrc\check_mif.py
+```
+
+```
+blk_mem_gen_0            coe=19200  mif=19200  mismatch=0
+blk_mem_headquarters     coe=400    mif=400    mismatch=0
+blk_mem_hq_destroyed     coe=400    mif=400    mismatch=0
+blk_mem_brick            coe=400    mif=400    mismatch=0
+cell(48,32)  = 3 (expect 3 river)
+cell(80,60)  = 0 (expect 0 player spawn)
+cell(76,112) = 5 (expect 5 base)
+RESULT: ALL MATCH
+```
+
+时间戳链也对得上：`level1.txt`/`map.coe` 15:34 → `blk_mem_gen_0.mif` 15:46 →
+`top.bit` 15:56，即比特流比地图数据新（后来 16:05 又把 `map.coe` 重生成过一次，
+内容逐值相同，`check_mif.py` 依然 `ALL MATCH`，所以不需要重新出比特流）。
+
+> 坑：Vivado 写出来的 `.mif` **没有文件头**，数据是 `RADIX=2` 的定宽 0/1 串
+> （16 位 ROM 每行 16 个字符、4 位地图每行 4 个字符）。
+> 当成十六进制读会得到一串假警报（砖墙 400 条**全部**“不一致”、地图 1680 条、
+> 基地 202 条），第一反应容易误判成“IP 没重新生成、比特流是旧的”。
+> 判定规则：整份文件全是 `0/1` → 二进制解析，出现 `2~F` 才是十六进制。
+
+最终构建（2026-11-14 15:56，`xc7a35tcpg236-1`）：
+
+```
+WNS = +1.528 ns   TNS = 0.000   WHS = +0.089 ns   THS = 0.000    (0 条违例)
+Slice LUT 1837 / 20800 (8.8%)   FF 1006 (2.4%)   BRAM 9.5 / 50   DSP 34 / 90
+DRC: 0 条 Critical/Error，只剩 CFGBVS-1（1 条，板级电压属性没写）+ DPIP/DPOP（84 条，probe 里 div5 的流水线建议）
+```
+
+资源和战前一致（改的只是 `map.coe` 的**内容**，不是结构），DSP 34 仍是
+4 个 `terrain_probe` 各自的 `div5`（像素 → 格），`tb_enemy` 那句老注释依然成立：
+要省 DSP 得把 `/5` 换成查表。
+
+
+## 第七轮：600x600 玩区 + 200px 信息栏 + 完整战斗（2026-11-14 晚）
+
+这一轮做两件事：**画面上**把玩区缩成 600x600、右边 200px 做成 HUD 信息栏；
+**玩法上**把“敌人开火 / 炮弹打坦克 / 兵种差异 / 生命与复活 / 胜负”补完。
+
+### 几何：800x600 屏幕，左边 600x600 是地图
+
+原来地图铺满 800x600（160x120 格），现在只有左边 600x600（120x120 格）：
+
+| 常量 | 原来 | 现在 | 在哪 |
+| --- | --- | --- | --- |
+| 地图格数 | 160 x 120 | **120 x 120** | `top.v` 的 `MAP_W` / `MAP_H` |
+| 地图地址 | `row*160 + col` | **`row*120 + col`** | `vga.v` / `terrain_probe.v` / `bullet-ctrl.v`（只有这三处） |
+| 像素步进 | 128+32（`(r<<7)+(r<<5)`） | **128-8（`(r<<7)-(r<<3)`）** | 同上，比原来还少一级加法 |
+| 基地精灵 | `HQ_X0=390` | **`HQ_X0=290`** | `vga.v`（`HQ_Y0=565` 不变，基地仍占格 56~63 x 112~117） |
+| 玩家出生 | (400,300) | **(300,300)** | `player.v` 的 `WIDTH/HEIGHT`、`map_generator.py` |
+| 敌人出生 | 40 / 380 / 740 | **40 / 300 / 560** | `enemy_ctrl.v`、`map_generator.py` |
+| 关卡文件 | 40x30 块 | **30x30 块** | `pysrc/maps/level1.txt` |
+
+**BRAM 的物理深度故意没改**（还是 19200 项、15 位地址）：逻辑上只需要
+120x120 = 14400 格，最大地址 14399 < 16384，尾部 4800 格永远指不到。
+好处是 `blk_mem_gen_0` 一行 IP 配置都不用动（不用重新生成 IP、不用改地址位宽、
+`bram_stubs.v` 也不用改）；`map_generator.py` 只是在 14400 格有效数据后面补 0 到 19200，
+让 coe 的项数等于深度。省下来的 2.4KB 在 9.5/50 个 BRAM36 的预算里不值一提，
+README 里留作“以后再说”。
+
+时序参数（800x600@60 的行场计数）**一个都没动** —— 只是把 `x >= 600` 的像素让给侧栏，
+并在地图地址上加了 `img_x < PLAY_W ? ... : 0` 的门控（侧栏不读地图）。
+
+### HUD：右侧 200px（`hud.v` + `font5x7.v`）
+
+```
+x=600 ┌─────────────────────────┐
+      │ ██ BATTLE CITY          │  600..601 是 2px 分界线，602..799 是面板
+      │    LEVEL 1              │
+      │    ENEMY                │
+      │    [快][火][甲]          │  20x20 图标，复用坦克 ROM（x=12+i*28, y=100）
+      │    SCORE                │
+      │    0600                 │
+      │    LIVES                │
+      │    3                    │
+      │                         │
+      │   ▓▓ GAME OVER ▓▓       │  y=300，闪烁 1.5Hz（板上会一明一暗）
+      │                         │
+      │   BTNC=FIRE             │
+      └─────────────────────────┘
+```
+
+| 设计点 | 做法 | 原因 |
+| --- | --- | --- |
+| 字形 | 5x7 点阵，放大 2 倍（10x14），字距 16px | 字距取 16 是为了让“第几个字符 = (x-行首)>>4”变成一条移位，**不要除法器** |
+| 字库 | `pysrc/font5x7.py`（唯一数据源）→ `pysrc/gen_font.py` 生成 `font5x7.v`（纯组合 case 表） | 只有 42 个字形，综合出来一百多个 LUT；不新建 BRAM IP，省掉 coe/stub/check_mif 一整套 |
+| 颜色 | 标题黄 `FE0`、标签浅蓝 `ADF`、数值白 `FFF`、面板底 `113`、分界线 `8CF` | 12 位色，和 VGA 调色板一致 |
+| 数字 | 分数显示 `nn00` 四位（分数永远是 100 的倍数） | 杀掉的是 100/200/300 分，所以只需要 score100 的十位/个位，**零除法器** |
+| 图标 | 输出 `icon_on/icon_addr/icon_type`，由 `vga.v` 把 4 个坦克 ROM 的地址 mux 过去 | 图标和场上坦克长得一模一样，不用第 5 张图；图标区域不在玩区，不会和真坦克抢像素 |
+| 对齐 | HUD 的坐标吃 `img_x_d1/img_y_d1`（延迟一拍） | map/贴图 ROM 都是 1 拍读延迟；HUD 是纯组合的，不打拍就整块左移 1 像素 |
+| 闪烁 | `blink_cnt[24]`（50MHz / 2^25 ≈ 1.5Hz） | 横幅共用一路闪烁，不额外占逻辑 |
+
+### 玩法：敌人开火 + 炮弹打坦克 + 兵种差异
+
+`bullet_ctrl` 从“玩家专用”升级成“**两种归属共用一套对象池**”，靠 `own[]` 区分
+（0 = 玩家，1..N_E = 第 i-1 辆敌人）：
+
+| 能力 | 实现 |
+| --- | --- |
+| 敌人开火 | `enemy_ctrl` 每 `FIRE_PERIOD` 个自己的移动节拍发一个单拍 `e_fire[i]`；和玩家的 `fire_pulse` 一起进同一个仲裁器（玩家优先，然后编号小的敌人） |
+| 炮口 | 先把“请求者”的坐标/朝向选出来（`src_x/src_y/src_d`），再套原来的四方向炮口公式 |
+| 打中坦克 | 弹体 10x10 与坦克 20x20 做包围盒相交；玩家的弹只打敌人（`hit_enemy[i]`），敌人的弹只打玩家（`hit_player`） |
+| 友军不误伤 | `e_hit_now` 只在 `own == 0` 时非零，`p_hit_now` 只在 `own != 0` 时非零 |
+| 弹对弹 | 归属不同 + 10x10 包围盒相交 -> 两发同时回收（`kill2_pulse`） |
+| 同屏 1 发 | 按 `own` 分组统计 `busy_p` / `busy_e[]`，**每个发射者**各自限 1 发（不是全局 1 发） |
+| 配色 | `b_owner` 给 `vga.v`：敌人的弹绿通道减半（白 -> 品红），一眼能分出谁打谁 |
+
+兵种差异（`enemy_ctrl` 里按出生点分配，`MOVE_DIV` = 玩家的 2 倍当“中间档”）：
+
+| 兵种 | 位置 | 移动 | 开火周期 | 血量 | 分数 |
+| --- | --- | --- | --- | --- | --- |
+| 快速 `T_FAST` | 左 (40,10) | `MOVE_DIV/2`（和玩家同速） | 6 个节拍 | 1 | 100 |
+| 火力 `T_POWER` | 中 (300,10) | `MOVE_DIV`（一半速度） | **4 个节拍**（弹幕最密） | 1 | 200 |
+| 装甲 `T_ARMOR` | 右 (560,10) | `MOVE_DIV*3/2` | 8 个节拍 | **2**（吃两发） | 300 |
+
+生命 / 胜负（`top.v` 的“打法状态机”）：
+
+* 玩家被打中 -> 生命 -1、回出生点、1 秒无敌（`INVULN_CYCLES`，无敌期间不会被打中）；
+* 生命耗尽 或 基地被打爆 -> `game_over` 锁存 -> `freeze=1`（玩家/敌人都不再动、不再开火）+ 侧栏 `GAME OVER`；
+* 三辆敌人全部击毁 -> `victory` -> 侧栏 `VICTORY`（本工程只有一关，没有下一关）；
+* 分数按兵种加分，侧栏显示 `nn00`。
+
+> `ENEMY_FIRE` 是 `top` 的参数（板上默认 1）：地形/移动那几个老用例把它关掉，
+> 结果才可复现（不然随机炮弹会把“坦克该走到哪”搅乱）。战斗本身在
+> `tb_bullet` / `tb_combat` 里测。
+
+> `hud.v` / `font5x7.v` 是新加的源文件，老 `.xpr` 里没有。`sim/build_all.tcl`
+> 开头会检查并 `add_files`（幂等），所以直接跑构建脚本就行，不用再单独跑
+> `add_*.tcl`。
+
+### 时序：新玩法把 100MHz 吃穿了，靠“开火流水线”救回来
+
+第一版（把命中判定和两种归属直接塞进 `bullet_ctrl`）综合出来
+**WNS = -0.81ns**，最差路径是：
+
+```
+u_bullet_ctrl/own_reg[3][1] ──► own[] -> busy_e[] (变量下标) -> enemy_ok
+    -> req_owner (优先级 mux) -> (n-1)*10 乘法 + 30 选 1 桶形移位 (炮口)
+    -> muzzle_y -> alloc_idx 4 选 1 -> y_reg[*][9]/D       共 14 级逻辑
+```
+
+也就是说“谁的弹在飞 → 谁能开火 → 选谁的炮口 → 写进对象池”这一整串在同一个
+10ns 里跑完了。修法是把这条链在“受理请求”和“算炮口/入池”之间切开：
+
+| 改动 | 效果 |
+| --- | --- |
+| `req_owner / spawn_req` 打一拍变成 `own_sel / spawn` | 链路从 14 级降到 ~7 级；开火请求本来就 5Hz 级别，多等一拍看不出来 |
+| `spawn` 还是高位时不接新请求 | 避免连续两拍各受理一个请求、算出同一个空槽（后一个覆盖前一个） |
+| 炮口选择改成 one-hot + 常量下标拼位 | 去掉 `(n-1)*10` 乘法 + 桶形移位（少两级） |
+| **弹对弹**改成“预先算好的 4x4 相撞矩阵”（`pair_now`） | 32 个“距离 <10px”的减法比较从扫描状态机里挪到寄存器前面，深度从 10.1ns 降到 3 级 |
+| HUD 的状态输入（分数/生命/胜负）先打一拍再进 `hud` | `game_over` 经 13 级组合链打到 `final_color_d1` 是 **sys -> vga 跨时钟路径**（-0.825ns，12 个端点）；打一拍就变回 FF -> FF |
+
+> 顺带：`freeze` 也接进了 `bullet_ctrl`（GAME OVER 时 `bullet_tick` 恒 0），
+> 炮弹会停在原地，而不是继续飞完最后一段。
+
+1. **HUD 整块不显示**：`hud.v` 里 `rel = px - lx0`，而 `px` 已经是“面板内坐标”
+   （减过 600），`lx0` 却是绝对坐标（612）——减出负数回绕成大数，`in_text` 永远为 0。
+   改成 `rel = x - lx0`（用绝对 x）。`tb_hud` 的 H05~H07 直接数“文字色像素个数”，
+   一条用例就把这种“整块空白”钉死。
+2. **贴脸打不中坦克**：坦克命中判定原来放在 `C_DEC`（读地图那个状态），而
+   “弹体压着的格组没变就跳过地图读”的去重会把整个 `C_DEC` 跳过。坦克 20x20 比
+   弹体大，弹体完全可能整整一个格组都压在坦克身上却一次都不读地图 —— 命中就漏了。
+   现在命中判定放在 `C_CMP` 的第一格（每个节拍都判、不需要地图数据），
+   去重只影响“要不要读地图”，不再影响“有没有打到坦克”。
+3. **用例之间互相污染**：`tb_bullet` 里上一条用例打剩的砖会挡住下一条用例的弹道
+   （B24“弹对弹”就是被 B18 留下的 行 55 那排砖挡掉的，表现为“玩家的弹半路消失”）。
+   现在 `do_reset` 顺手 `clear_map`，每条用例都从干净地图开始。
+
+### 验证
+
+```text
+tb_terrain 24/24  tb_bullet 88/88  tb_enemy 38/38  tb_combat 20/20  tb_hud 27/27
+（x 4 种 BRAM 读延迟 0/1/2/3 拍 = 20 次全绿）
+
+python pysrc\check_mif.py
+blk_mem_gen_0        coe=19200  mif=19200  mismatch=0
+cell(56,112) = 5 (base)   cell(119,119) = 0 (last valid cell)   padding = 0
+RESULT: ALL MATCH
+
+完整构建（synth + impl + bit）：
+  WNS = +0.674 ns   WHS = +0.051 ns   0 failing endpoints
+  Slice LUTs 3443 (16.55%)   Slice Registers 1308 (3.14%)
+  Block RAM 9.5 (19.00%)     DSP 34 (37.78%)
+```
+
+资源对比（这一轮之前 -> 之后）：LUT 1837 (8.83%) -> 3443 (16.55%)，
+FF 1006 -> 1308，BRAM 9.5 -> **9.5（没变）**，DSP 34 -> 34。
+LUT 的增量主要是这些：HUD 字库/排版（约 300）、弹对弹的 4x4 相撞矩阵（约 400）、
+两种炮弹的归属/命中判定（约 300）、兵种各自的节拍/血量/开火计数器（约 200）、
+以及打拍引入的寄存器和 HUD 的 CDC 同步。BRAM 一点没多 —— 字库是用 LUT 做的。
+
+
+## 第八轮：敌人爆炸动画（2026-11-14 晚）
+
+上一轮留下了唯一一个“知道怎么做、但没做”的东西：坦克被击毁时直接消失，没有爆炸。
+这一轮补上：**4 个爆炸槽 + 2 帧贴图 + 6 个相位**，敌人和玩家共用同一套。
+（贴图 `tank_destroyed1/2_16bit.coe` 早就在工程根目录里，只是没有 ROM 去读它。）
+
+### 结构：状态和像素分开
+
+```
+top: enemy_ctrl.e_kill[i] ──┐
+     b_hit_player            ├──► fx_ctrl ──(fx_valid/x/y/frame)──► vga: 爆炸图层
+                             ┘      4 槽 × (x,y,相位,拍数)         ├ blk_mem_tank_destroyed1 (亮爆团)
+                                                                   └ blk_mem_tank_destroyed2 (星形环)
+```
+
+* `fx_ctrl.v` 只管**时间**：谁死了、开在哪个槽、现在是哪个相位。
+* `vga.v` 只管**像素**：命中 20x20 包围盒 -> 算 `row*20+col` -> 读两张 ROM -> 按帧号 mux。
+* 和坦克一样，跨到 `vga_clk` 域时先打一拍（`fx_*_q`），地址由 vga 域的寄存器驱动。
+
+### 三个容易踩的点
+
+1. **位置必须在“死亡那一拍”采样。**
+   玩家挨打后 `top` 立刻拉 `respawn_pulse`，下一拍 `player.v` 就把坐标跳回 (300,300)。
+   如果爆炸晚一拍采坐标，火球就跑到画面正中。`fx_ctrl` 和 `player.v` 因此接同一个
+   `clock`、在同一个沿采样 —— 那时还是死亡位置。`tb_combat` 的 C10c/d 专门钉住这条。
+2. **同拍多死不能丢。**
+   最坏情况是 3 辆敌人 + 玩家在同一拍全死（两发炮弹同拍命中，或弹对弹的同时另一发打中坦克）。
+   所以做 4 个槽，并且用**纯组合分配**：同一拍把 4 个请求各写进一个空闲槽，
+   不需要排队、也不会有“晚几拍才炸”的抖动。
+   分配顺序是确定的：请求从高到低（玩家最高）、每人占当前最靠后的空闲槽。
+3. **满池就丢，不覆盖。**
+   4 个槽都占着时再来的请求直接丢弃。宁可少一个火球，也不能把正在放的那个重置
+   （会把“同一处的爆炸”变成永远炸不完的循环）。`tb_fx` 的 X08 钉住这条。
+
+### 动画参数
+
+| 参数 | 板上值 | 含义 |
+| --- | --- | --- |
+| `FX_DIV` | 8_000_000 | 每个相位 80ms（100MHz） |
+| `FX_PHASES` | 6 | 3 个相位放亮爆团 + 3 个相位放星形环 = **480ms** |
+| `N_FX` | 4 | 爆炸槽数（3 敌 + 玩家） |
+
+`FX_DIV` 是 `top` 的 parameter，仿真里缩到 8 拍，一个用例几十拍就够，不用等 800 万拍。
+
+### 两个新 ROM IP
+
+`blk_mem_tank_destroyed1/2` 和 `blk_mem_tank_*` 的参数完全一致（512x16 单口 ROM、
+1 拍读延迟、coe 指向工程根目录），所以 `vga.v` 里就是复制一个实例、改个名字。
+`build_all.tcl` 开头现在会**自动创建**这两个 IP（`create_ip` + `set_property CONFIG.*`，
+幂等），换台机器打开工程也不会缺 IP。
+
+> 这张图能在不上板的情况下看：`python img\preview.py --explosion` -> `img/preview_explosion.png`
+> （中间那辆火力坦克刚被击毁，画的是第 1 帧亮爆团；被击毁的车不再画，HUD 的敌人图标同步少一个）。
+
+### 验证
+
+```text
+tb_terrain 24/24  tb_bullet 88/88  tb_enemy 38/38  tb_combat 28/28
+tb_hud 34/34      tb_fx 30/30
+（x 4 种 BRAM 读延迟 0/1/2/3 拍 = 24 次全绿，共 242 条断言/轮）
+
+python pysrc\check_mif.py
+blk_mem_tank_destroyed1  coe=400  mif=400  mismatch=0
+blk_mem_tank_destroyed2  coe=400  mif=400  mismatch=0
+RESULT: ALL MATCH
+
+完整构建（synth + impl + bit，0 errors / 0 critical warnings / 0 warnings）：
+  WNS = +1.135 ns   WHS = +0.047 ns   0 failing endpoints
+  Slice LUTs 3768 (18.12%)   Slice Registers 1594 (3.83%)
+  Block RAM 10.5 (21.00%)    DSP 34 (37.78%)
+```
+
+资源对比（上一轮 -> 这一轮）：LUT 3443 (16.55%) -> 3768 (18.12%)，FF 1308 -> 1594，
+**BRAM 9.5 -> 10.5**（+1 个 BRAM36 = 两张 512x16 的爆炸贴图），DSP 34 -> 34。
+LUT 的 325 增量是：4 个爆炸槽的分配/相位计数器（约 180）、vga 的包围盒比较 + 地址 mux
+（约 90）、跨到 vga 域的打拍寄存器（约 55）。
+时序反而更松了（+0.674 -> +1.135）：新增的路径全是"寄存器 -> 小组合 -> 寄存器"，
+没有插到原来那条 sys_clk -> vga_clk 的 ROM 地址链上。
+
+> 写测试台时的坑：在 `@(posedge clock)` 的同一时间点 `$display` 信号，读到的是
+> **打拍之前**的值（NBAs 还没生效），整个用例会差一拍。`tb_fx` 的 `wait_clk` 一律在
+> negedge 返回，相位边界才数得准（相位 2 -> 3 正好是第 24 拍）。
+

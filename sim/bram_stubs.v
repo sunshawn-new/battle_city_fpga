@@ -117,6 +117,25 @@ module blk_mem_player_tank(
     always @(posedge clka) douta <= 16'h0000;
 endmodule
 
+// 三种敌人兵种的贴图 ROM（20x20 = 400 项，IP 512 深 -> 9 位地址）
+module blk_mem_tank_fast(
+    input clka, input [8:0] addra, output reg [15:0] douta
+);
+    always @(posedge clka) douta <= 16'h0000;
+endmodule
+
+module blk_mem_tank_power(
+    input clka, input [8:0] addra, output reg [15:0] douta
+);
+    always @(posedge clka) douta <= 16'h0000;
+endmodule
+
+module blk_mem_tank_armor(
+    input clka, input [8:0] addra, output reg [15:0] douta
+);
+    always @(posedge clka) douta <= 16'h0000;
+endmodule
+
 // 炮弹贴图 ROM：10x10 = 100 项，IP 配置成 128 深 -> 7 位地址
 module blk_mem_bullet(
     input clka, input [6:0] addra, output reg [15:0] douta
@@ -126,6 +145,27 @@ endmodule
 
 // 基地贴图 ROM：20x20 = 400 项，IP 配置成 512 深 -> 9 位地址
 module blk_mem_headquarters(
+    input clka, input [8:0] addra, output reg [15:0] douta
+);
+    always @(posedge clka) douta <= 16'h0000;
+endmodule
+
+// 基地被打爆后的贴图（白旗 + 断杆 + 碎石），同样 512x16
+module blk_mem_hq_destroyed(
+    input clka, input [8:0] addra, output reg [15:0] douta
+);
+    always @(posedge clka) douta <= 16'h0000;
+endmodule
+
+// 坦克被击毁的两帧爆炸贴图（20x20 = 400 项，IP 512 深 -> 9 位地址）
+//   第 1 帧：亮黄白色的实心爆团；第 2 帧：橙色的星形环
+module blk_mem_tank_destroyed1(
+    input clka, input [8:0] addra, output reg [15:0] douta
+);
+    always @(posedge clka) douta <= 16'h0000;
+endmodule
+
+module blk_mem_tank_destroyed2(
     input clka, input [8:0] addra, output reg [15:0] douta
 );
     always @(posedge clka) douta <= 16'h0000;
