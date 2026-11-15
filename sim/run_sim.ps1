@@ -1,8 +1,9 @@
 # 用 xsim 运行全部仿真用例（在 PowerShell 里执行：.\run_sim.ps1）
 #
 # 做的事：
-#   1. 把工程根目录的 map.coe 转成 map_mem.hex（bram_stubs.v 用 $readmemh 加载）
-#   2. 用 BRAM_LATENCY = 0 / 1 / 2 / 3 编译并运行全部 5 套用例
+#   1. 把工程根目录的 map.coe / levels.coe 转成 map_mem.hex / levels_mem.hex
+#      （bram_stubs.v 用 $readmemh 加载，仿真用的就是板上那两张表）
+#   2. 用 BRAM_LATENCY = 0 / 1 / 2 / 3 编译并运行全部用例
 #      —— 真实 IP 是 1 拍，但这里要把 0~3 拍全跑一遍，证明扫描逻辑与读延迟无关
 #   3. 汇总每套用例的 [ OK ] / [FAIL] 数，任何一套没过就 exit 1
 #
@@ -10,9 +11,10 @@
 #   tb_terrain 地形碰撞（玩家移动 / 砖钢河树 / 基地顶盖 / 地图契约）
 #   tb_bullet  炮弹（对象池 / 飞行 / 打砖 / 命中坦克 / 弹对弹 / 归属）
 #   tb_enemy   敌人（AI / 兵种速度·血量·开火周期 / 冻结）
-#   tb_combat  关卡流程（生命 / 无敌 / 分数 / GAME OVER / VICTORY）
+#   tb_combat  关卡流程（生命 / 无敌 / 分数 / GAME OVER / 爆炸时机）
 #   tb_hud     侧栏（边界 / 底色 / 文字 / 数字 / 图标 / 横幅）
 #   tb_fx      爆炸特效（槽池分配 / 相位 / 两帧 / 满池丢弃 / 复用）
+#   tb_stage   关卡与波次（块图装载 / 补车节奏 / STAGE CLEAR / 换关循环）
 param(
     [int[]]$Latency = @(0, 1, 2, 3)
 )
@@ -40,28 +42,35 @@ if (-not $xvlog) { throw 'xvlog not found, please run this script in a Vivado en
 
 Push-Location $PSScriptRoot
 try {
-    # ---------- 1. map.coe -> map_mem.hex ----------
-    $coe = Join-Path (Split-Path $PSScriptRoot -Parent) 'map.coe'
-    if (-not (Test-Path $coe)) { throw "map.coe not found: $coe" }
-
-    $vals = New-Object System.Collections.Generic.List[string]
-    $inBody = $false
-    foreach ($line in (Get-Content -LiteralPath $coe)) {
-        if (-not $inBody) {
-            if ($line -match 'memory_initialization_vector') { $inBody = $true }
-            continue
+    # ---------- 1. coe -> hex（bram_stubs 用 $readmemh 加载）----------
+    # 两个 .coe 都是“radix 16 + 一行一项”，转成一行一项的 hex 文本即可。
+    function Convert-CoeToHex {
+        param([string]$Coe, [string]$Hex, [int]$Expect)
+        if (-not (Test-Path $Coe)) { throw "coe not found: $Coe" }
+        $vals = New-Object System.Collections.Generic.List[string]
+        $inBody = $false
+        foreach ($line in (Get-Content -LiteralPath $Coe)) {
+            if (-not $inBody) {
+                if ($line -match 'memory_initialization_vector') { $inBody = $true }
+                continue
+            }
+            foreach ($tok in ($line -split '[,\s;]+')) {
+                if ($tok -ne '') { $vals.Add($tok) }
+            }
         }
-        foreach ($tok in ($line -split '[,\s;]+')) {
-            if ($tok -ne '') { $vals.Add($tok) }
+        if ($vals.Count -ne $Expect) {
+            throw "$(Split-Path $Coe -Leaf): expected $Expect entries, got $($vals.Count)"
         }
+        Set-Content -LiteralPath $Hex -Value $vals -Encoding ASCII
+        Write-Host ("[{0}] -> {1} ({2} entries)" -f (Split-Path $Coe -Leaf),
+                    (Split-Path $Hex -Leaf), $vals.Count) -ForegroundColor Cyan
     }
-    if ($vals.Count -ne 19200) {
-        throw "map.coe: expected 19200 entries (14400 cells + padding to BRAM depth), got $($vals.Count)"
-    }
-    Set-Content -LiteralPath (Join-Path $PSScriptRoot 'map_mem.hex') -Value $vals -Encoding ASCII
-    Write-Host ("[map] map.coe -> map_mem.hex ({0} entries)" -f $vals.Count) -ForegroundColor Cyan
 
-    # ---------- 2. 每种 BRAM 读延迟各跑一遍（地形 + 炮弹 + 敌人三套用例）----------
+    $root = Split-Path $PSScriptRoot -Parent
+    Convert-CoeToHex (Join-Path $root 'map.coe')    (Join-Path $PSScriptRoot 'map_mem.hex')    19200
+    Convert-CoeToHex (Join-Path $root 'levels.coe') (Join-Path $PSScriptRoot 'levels_mem.hex') 4096
+
+    # ---------- 2. 每种 BRAM 读延迟各跑一遍 ----------
     $src = Resolve-Path (Join-Path $PSScriptRoot '..\battle_city_fpga.srcs\sources_1\new')
     $design = @(
         (Join-Path $src 'top.v'),
@@ -73,7 +82,9 @@ try {
         (Join-Path $src 'terrain_probe.v'),
         (Join-Path $src 'map_bus.v'),
         (Join-Path $src 'bullet-ctrl.v'),
-        (Join-Path $src 'fx_ctrl.v')
+        (Join-Path $src 'fx_ctrl.v'),
+        (Join-Path $src 'stage_ctrl.v'),
+        (Join-Path $src 'level_loader.v')
     )
     # 每套用例：名字 / 顶层 / 最少应通过的断言数
     # （Min 只是“下限”，防止某个用例被整段跳过还显示 PASS；
@@ -83,8 +94,9 @@ try {
         [pscustomobject]@{ Name = 'tb_bullet';  File = 'tb_bullet.v';  Min = 88 },
         [pscustomobject]@{ Name = 'tb_enemy';   File = 'tb_enemy.v';   Min = 38 },
         [pscustomobject]@{ Name = 'tb_combat';  File = 'tb_combat.v';  Min = 28 },
-        [pscustomobject]@{ Name = 'tb_hud';     File = 'tb_hud.v';     Min = 34 },
-        [pscustomobject]@{ Name = 'tb_fx';      File = 'tb_fx.v';      Min = 30 }
+        [pscustomobject]@{ Name = 'tb_hud';     File = 'tb_hud.v';     Min = 36 },
+        [pscustomobject]@{ Name = 'tb_fx';      File = 'tb_fx.v';      Min = 30 },
+        [pscustomobject]@{ Name = 'tb_stage';   File = 'tb_stage.v';   Min = 40 }
     )
     $results = @()
 

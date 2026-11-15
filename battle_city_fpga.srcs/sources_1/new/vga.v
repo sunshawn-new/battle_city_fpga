@@ -36,6 +36,7 @@ module vga #(
     input wire [3:0]        hud_score100,
     input wire [2:0]        hud_lives,
     input wire [2:0]        hud_level,
+    input wire [5:0]        hud_enemy_left,  // 本关剩余敌人（HUD 显示 ENEMY nn）
     input wire              hud_game_over,
     input wire              hud_victory,
     output wire vga_clk,
@@ -491,19 +492,22 @@ module vga #(
     // 分数/生命/胜负都是准静态信号（几秒才变一次），晚一拍完全看不出来。
     reg [3:0] hud_score100_q;
     reg [2:0] hud_lives_q, hud_level_q;
+    reg [5:0] hud_enemy_left_q;
     reg       hud_game_over_q, hud_victory_q;
     always @(posedge vga_clk) begin
-        hud_score100_q  <= hud_score100;
-        hud_lives_q     <= hud_lives;
-        hud_level_q     <= hud_level;
-        hud_game_over_q <= hud_game_over;
-        hud_victory_q   <= hud_victory;
+        hud_score100_q   <= hud_score100;
+        hud_lives_q      <= hud_lives;
+        hud_level_q      <= hud_level;
+        hud_enemy_left_q <= hud_enemy_left;
+        hud_game_over_q  <= hud_game_over;
+        hud_victory_q    <= hud_victory;
     end
 
     hud #(.N_E(N_E)) u_hud (
         .clock(vga_clk), .reset(reset),
         .x(img_x_d1), .y(img_y_d1),
         .score100(hud_score100_q), .lives(hud_lives_q), .level(hud_level_q),
+        .enemy_left(hud_enemy_left_q),
         .enemy_valid(enemy_valid_q), .enemy_type(enemy_type_q),
         .game_over(hud_game_over_q), .victory(hud_victory_q),
         .hud_on(hud_on), .rgb(hud_rgb),

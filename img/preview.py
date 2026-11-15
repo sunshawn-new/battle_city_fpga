@@ -27,6 +27,9 @@
 #                                       #    敌人全灭的结算画面
 #    python img\preview.py --explosion      # -> img/preview_explosion.png
 #                                       #    中间那辆敌人刚被击毁（第 1 帧亮爆团）
+#    python img\preview.py --level 2        # -> img/preview_level2.png
+#                                       #    第 2/3/4 关的地图（从 pysrc/maps/levelN.txt
+#                                       #    按 level_loader.v 的展开规则算出来）
 # ============================================================================
 import os
 import re
@@ -139,6 +142,23 @@ def enemy_tint(word):
     return (word & 0xF000) | tints.get(word & 0xFFF, word & 0xFFF)
 
 
+def read_level_map(level):
+    """第 N 关的 120x120 格地形（14400 项，再补 0 到 BRAM 的物理深度 19200）。
+
+    板上的地图在上电时是 map.coe（第 1 关），换关时由 level_loader.v 从
+    levels.coe 的“块图”展开重写。离线预览直接用 pysrc/gen_levels.py 里那套
+    同样的展开规则（gen_levels 已经把这条规则和 map_generator.expand()
+    逐格比对过），所以预览图和板上看到的是同一张地图。"""
+    import map_generator as mg
+    import gen_levels
+    path = os.path.join(ROOT, 'pysrc', 'maps', 'level%d.txt' % level)
+    rows = mg.load_level(path)
+    mg.check_level(rows)
+    cells = gen_levels.expand_cells([mg.TILE_CHAR[ch] for row in rows for ch in row])
+    flat = [cells[y][x] for y in range(mg.MAP_ROWS) for x in range(mg.MAP_COLS)]
+    return flat + [0] * (19200 - len(flat))
+
+
 def main():
     reversed_bits = '--reversed' in sys.argv
     hq_destroyed  = '--hq-destroyed' in sys.argv
@@ -146,9 +166,17 @@ def main():
     explosion     = '--explosion' in sys.argv
     game_over     = hq_destroyed            # 基地没了就是 GAME OVER，HUD 一起画
 
-    tile_map = read_coe('map.coe')
-    # map.coe 是 14400 格有效数据 + 补齐到 BRAM 深度 19200 个 0
-    assert len(tile_map) == 19200, 'map.coe 尺寸不对（应为 19200 = 14400 + 填充）'
+    # --level N：渲染第 N 关的地图（默认 1 = map.coe，和板上上电时一致）
+    level = 1
+    if '--level' in sys.argv:
+        level = int(sys.argv[sys.argv.index('--level') + 1])
+
+    if level == 1:
+        tile_map = read_coe('map.coe')
+        # map.coe 是 14400 格有效数据 + 补齐到 BRAM 深度 19200 个 0
+        assert len(tile_map) == 19200, 'map.coe 尺寸不对（应为 19200 = 14400 + 填充）'
+    else:
+        tile_map = read_level_map(level)
     names = ('brick', 'steel', 'river', 'woods', 'tank', 'bullet',
              'headquarters', 'headquarters_destroyed',
              'tank_fast', 'tank_power', 'tank_armor',
@@ -219,10 +247,11 @@ def main():
             used[color] = used.get(color, 0) + 1
 
     # ---------------- HUD：右侧 200px 信息栏（和 hud.v 逐行对应）----------------
-    # 演示状态：击杀两辆（600 分）、还剩 3 条命、关卡 1
+    # 演示状态：击杀两辆（600 分）、还剩 3 条命、本关还剩 20 辆（开局一屏 3 辆）
     # 爆炸图：中间那辆被击毁（+200），左右两辆还在
     score100    = 3 if victory else 6
     lives       = 3
+    enemies_left = 20
     enemies_on  = [False, False, False] if victory else [True, True, True]
     if explosion:
         score100   = 2
@@ -239,8 +268,8 @@ def main():
         draw_text(pixels, PANEL_X + x_off, y0, text, color)
 
     hud_text(16,  'BATTLE CITY', HUD_TITLE)
-    hud_text(44,  'LEVEL 1',     HUD_LABEL)
-    hud_text(76,  'ENEMY',       HUD_LABEL)
+    hud_text(44,  'LEVEL %d' % level, HUD_LABEL)
+    hud_text(76,  'ENEMY %02d' % enemies_left, HUD_LABEL)
     # 敌人图标：位置/兵种和 hud.v 的 g_icon 一致（x = 12 + i*28, y = 100）
     icon_names = ('tank_fast', 'tank_power', 'tank_armor')
     for i, tn in enumerate(icon_names):
@@ -259,7 +288,7 @@ def main():
         if game_over:
             hud_text(300, 'GAME OVER', HUD_VALUE, 28)
         else:
-            hud_text(300, 'VICTORY', HUD_VALUE, 40)
+            hud_text(300, 'STAGE CLEAR', HUD_VALUE, 12)
 
     for y in range(H):
         for x in range(W):
@@ -276,6 +305,8 @@ def main():
         name = 'preview_reversed.png'
     else:
         name = 'preview.png'
+    if level != 1:
+        name = 'preview_level%d.png' % level
     out = os.path.join(IMG_DIR, name)
     img.save(out)
 

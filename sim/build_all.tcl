@@ -17,7 +17,7 @@ open_project "$root/battle_city_fpga.xpr"
 # 幂等：重复运行不会重复添加。hud.v / font5x7.v 是 600x600 + 侧栏那一版加的，
 # 老工程文件（.xpr）里没有它们，综合会报 "module 'hud' not found"。
 set src_dir "$root/battle_city_fpga.srcs/sources_1/new"
-foreach f {hud.v font5x7.v fx_ctrl.v} {
+foreach f {hud.v font5x7.v fx_ctrl.v stage_ctrl.v level_loader.v} {
     set p "$src_dir/$f"
     if {[llength [get_files -quiet $p]] == 0} {
         puts "=== add source: $f ==="
@@ -53,6 +53,33 @@ foreach {ipn coef} [list blk_mem_tank_destroyed1 tank_destroyed1_16bit.coe \
         CONFIG.Enable_A {Always_Enabled} \
         CONFIG.Enable_B {Always_Enabled} \
     ] [get_ips $ipn]
+}
+update_compile_order -fileset sources_1
+
+# ---- 关卡 ROM（4 关的 30x30 块图，4096 x 4）----
+# 这是一张“块图”ROM：每关 1024 项（900 块 + 124 个 0），由 level_loader.v
+# 展开成 120x120 的地图格写进地图 RAM。宽度只有 4 位，综合后不到 1 个 BRAM18。
+# 内容来自 pysrc/gen_levels.py 生成的 levels.coe。
+if {[llength [get_ips -quiet blk_mem_level]] == 0} {
+    puts "=== create IP: blk_mem_level ==="
+    create_ip -name blk_mem_gen -vendor xilinx.com -library ip -version 8.4 -module_name blk_mem_level
+    set_property -dict [list \
+        CONFIG.Memory_Type {Single_Port_ROM} \
+        CONFIG.Write_Width_A {4} \
+        CONFIG.Write_Depth_A {4096} \
+        CONFIG.Read_Width_A {4} \
+        CONFIG.Write_Width_B {4} \
+        CONFIG.Read_Width_B {4} \
+        CONFIG.Operating_Mode_A {WRITE_FIRST} \
+        CONFIG.Register_PortA_Output_of_Memory_Primitives {true} \
+        CONFIG.Load_Init_File {true} \
+        CONFIG.Coe_File "../../../../levels.coe" \
+        CONFIG.Fill_Remaining_Memory_Locations {false} \
+        CONFIG.Enable_A {Always_Enabled} \
+        CONFIG.Enable_B {Always_Enabled} \
+    ] [get_ips blk_mem_level]
+} else {
+    puts "=== IP exists: blk_mem_level ==="
 }
 update_compile_order -fileset sources_1
 

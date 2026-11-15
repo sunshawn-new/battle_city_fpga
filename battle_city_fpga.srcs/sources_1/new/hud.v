@@ -41,6 +41,7 @@ module hud #(
     input      [3:0]  score100,        // 分数 = score100 * 100（见 top.v 的说明）
     input      [2:0]  lives,
     input      [2:0]  level,
+    input      [5:0]  enemy_left,      // 本关还剩多少辆敌人（含场上活着的）
     input      [N_E-1:0]   enemy_valid,
     input      [N_E*2-1:0] enemy_type,  // 图标按兵种选贴图
     input             game_over,        // 基地被摧毁 / 生命耗尽
@@ -64,11 +65,11 @@ module hud #(
     //   行表（y0 / 行首 x / 内容）：
     //     16   BATTLE CITY              标题
     //     44   LEVEL n                  关卡
-    //     76   ENEMY                    敌人标签
+    //     76   ENEMY nn                敌人（+ 本关剩余数，两位十进制）
     //     100  敌人图标格（20x20，间距 28）
     //     132  SCORE  /  160  nn00      分数
     //     192  LIVES  /  220  n         生命
-    //     300  GAME OVER / VICTORY      结算横幅（闪烁）
+    //     300  GAME OVER / STAGE CLEAR  结算横幅（闪烁）
     //     556  BTNC=FIRE                按键提示
     //   所有文字行都是 14px 高（= 7 行 x 2 倍），所以 (y - y0) >> 1 就是字模行号。
     reg [3:0]  li;      // 行号，4'hF = 这一行不是文字
@@ -97,7 +98,7 @@ module hud #(
         end else if (game_over && y >= 11'd300 && y < 11'd314) begin
             li = 4'd8; lx0 = X0 + 11'd28; ly0 = 11'd300;
         end else if (victory && y >= 11'd300 && y < 11'd314) begin
-            li = 4'd9; lx0 = X0 + 11'd40; ly0 = 11'd300;
+            li = 4'd9; lx0 = X0 + 11'd12; ly0 = 11'd300;
         end
     end
 
@@ -135,6 +136,14 @@ module hud #(
     wire [3:0] sc_hi = (score100 >= 4'd10) ? 4'd1 : 4'd0;
     wire [3:0] sc_lo = score100 - (sc_hi * 4'd10);
 
+    // 剩余敌人数的两位十进制（0..43：每关最多 20 辆，加上场上的 3 辆不会溢出）。
+    // 同样是“比较链 + 一次乘 10”，没有除法器：6 位比较器 5 个，十几 LUT。
+    wire [3:0] el_hi = (enemy_left >= 6'd40) ? 4'd4 :
+                       (enemy_left >= 6'd30) ? 4'd3 :
+                       (enemy_left >= 6'd20) ? 4'd2 :
+                       (enemy_left >= 6'd10) ? 4'd1 : 4'd0;
+    wire [3:0] el_lo = enemy_left - (el_hi * 4'd10);
+
     reg [7:0] ch;
     always @(*) begin
         ch = C_SP;                      // 默认空格
@@ -152,9 +161,11 @@ module hud #(
                 4'd6: ch = dchr({1'b0, level});
                 default: ch = C_SP;
             endcase
-            4'd2: case (ci)             // ENEMY
+            4'd2: case (ci)             // ENEMY nn
                 4'd0: ch = C_E; 4'd1: ch = C_N; 4'd2: ch = C_E;
                 4'd3: ch = C_M; 4'd4: ch = C_Y;
+                4'd6: ch = dchr(el_hi);
+                4'd7: ch = dchr(el_lo);
                 default: ch = C_SP;
             endcase
             4'd3: case (ci)             // SCORE
@@ -190,10 +201,11 @@ module hud #(
                 4'd6: ch = C_V; 4'd7: ch = C_E; 4'd8: ch = C_R;
                 default: ch = C_SP;
             endcase
-            4'd9: case (ci)             // VICTORY
-                4'd0: ch = C_V; 4'd1: ch = C_I; 4'd2: ch = C_C;
-                4'd3: ch = C_T; 4'd4: ch = C_O; 4'd5: ch = C_R;
-                4'd6: ch = C_Y;
+            4'd9: case (ci)             // STAGE CLEAR
+                4'd0: ch = C_S; 4'd1: ch = C_T; 4'd2: ch = C_A;
+                4'd3: ch = C_G; 4'd4: ch = C_E; 4'd5: ch = C_SP;
+                4'd6: ch = C_C; 4'd7: ch = C_L; 4'd8: ch = C_E;
+                4'd9: ch = C_A; 4'd10: ch = C_R;
                 default: ch = C_SP;
             endcase
             default: ch = C_SP;

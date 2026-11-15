@@ -1,6 +1,7 @@
 # xsim 产生的中间文件
 xsim.dir/
 xsim*.backup*
+*.wdb
 webtalk*.jou
 webtalk*.log
 *.jou
@@ -11,6 +12,7 @@ pid.txt
 
 # 生成的 / 临时的仿真与报告文件
 map_mem.hex
+levels_mem.hex
 sim_latency_*.log
 timing_report.txt
 clocks_probe.txt

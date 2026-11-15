@@ -59,6 +59,7 @@ def compare(name, coe_path):
 
 ok = True
 ok &= compare('blk_mem_gen_0', os.path.join(ROOT, 'map.coe'))
+ok &= compare('blk_mem_level', os.path.join(ROOT, 'levels.coe'))
 ok &= compare('blk_mem_headquarters', os.path.join(ROOT, 'headquarters_16bit.coe'))
 ok &= compare('blk_mem_hq_destroyed', os.path.join(ROOT, 'headquarters_destroyed_16bit.coe'))
 ok &= compare('blk_mem_brick', os.path.join(ROOT, 'brick_16bit.coe'))
@@ -75,6 +76,13 @@ print('cell(60,60)  =', coe[60 * MAP_W + 60], '(expect 0 player spawn)')
 print('cell(56,112) =', coe[112 * MAP_W + 56], '(expect 5 base)')
 print('cell(119,119)=', coe[119 * MAP_W + 119], '(expect 0, last valid cell)')
 print('cell padding =', coe[14400], '(expect 0, first padded entry)')
+
+# 关卡 ROM：4096 项 = 4 关 x 1024，第 i 关的块图从 (i-1)*1024 开始，块地址 = 行*30 + 列
+lvl = read_coe(os.path.join(ROOT, 'levels.coe'))
+print('levels entries =', len(lvl), '(expect 4096 = 4 levels x 1024)')
+print('L1 blk(14,28)  =', lvl[28 * 30 + 14], '(expect 5 base block)')
+print('L2 blk(14,28)  =', lvl[1024 + 28 * 30 + 14], '(expect 5 base block)')
+print('L1 blk(2,0)    =', lvl[0 * 30 + 2], '(expect 0 empty spawn block)')
 print('RESULT:', 'ALL MATCH' if ok else 'MISMATCH')
 sys.exit(0 if ok else 1)
 

@@ -143,14 +143,15 @@ OPTRACE "add files" START { }
   read_ip -quiet E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.srcs/sources_1/ip/blk_mem_steel/blk_mem_steel.xci
   read_ip -quiet E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.srcs/sources_1/ip/blk_mem_river/blk_mem_river.xci
   read_ip -quiet E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.srcs/sources_1/ip/blk_mem_brick/blk_mem_brick.xci
-  read_ip -quiet e:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.srcs/sources_1/ip/blk_mem_tank_destroyed1/blk_mem_tank_destroyed1.xci
-  read_ip -quiet e:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.srcs/sources_1/ip/blk_mem_tank_destroyed2/blk_mem_tank_destroyed2.xci
   add_files -quiet E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.runs/blk_mem_bullet_synth_1/blk_mem_bullet.dcp
   add_files -quiet E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.runs/blk_mem_hq_destroyed_synth_1/blk_mem_hq_destroyed.dcp
   add_files -quiet E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.runs/blk_mem_headquarters_synth_1/blk_mem_headquarters.dcp
+  add_files -quiet E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.runs/blk_mem_tank_destroyed2_synth_1/blk_mem_tank_destroyed2.dcp
+  add_files -quiet E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.runs/blk_mem_tank_destroyed1_synth_1/blk_mem_tank_destroyed1.dcp
   add_files -quiet E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.runs/blk_mem_tank_armor_synth_1/blk_mem_tank_armor.dcp
   add_files -quiet E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.runs/blk_mem_tank_power_synth_1/blk_mem_tank_power.dcp
   add_files -quiet E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.runs/blk_mem_tank_fast_synth_1/blk_mem_tank_fast.dcp
+  add_files -quiet E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.runs/blk_mem_level_synth_1/blk_mem_level.dcp
 OPTRACE "read constraints: implementation" START { }
   read_xdc E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.srcs/constrs_1/new/constr.xdc
 OPTRACE "read constraints: implementation" END { }

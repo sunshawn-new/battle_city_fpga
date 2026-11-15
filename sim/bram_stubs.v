@@ -86,6 +86,32 @@ module blk_mem_gen_0(
                    (LATENCY == 2) ? dly_b1    : dly_b2;
 endmodule
 
+// ---------------- 关卡 ROM 桩（blk_mem_level：4096 x 4，1 拍读延迟）----------------
+// 内容来自 levels_mem.hex（run_sim.ps1 从工程根目录的 levels.coe 现场生成）。
+// tb_stage 用它验证“换关时地图真的被重写了”，所以这里不能像贴图 ROM 那样返回 0。
+module blk_mem_level(
+    input             clka,
+    input      [11:0] addra,
+    output reg [3:0]  douta
+);
+    reg [3:0] mem [0:4095];
+    integer i, fd;
+
+    initial begin
+        for (i = 0; i < 4096; i = i + 1) mem[i] = 4'd0;
+        fd = $fopen("levels_mem.hex", "r");
+        if (fd != 0) begin
+            $fclose(fd);
+            $readmemh("levels_mem.hex", mem);
+            $display("[bram_stub] level blocks loaded from levels_mem.hex (real levels.coe)");
+        end else begin
+            $display("[bram_stub] WARNING: levels_mem.hex not found - all levels look empty!");
+        end
+    end
+
+    always @(posedge clka) douta <= mem[addra];
+endmodule
+
 // ---------------- 贴图 ROM 桩：读延迟 1 拍，数据全 0 ----------------
 module blk_mem_brick(
     input clka, input [8:0] addra, output reg [15:0] douta

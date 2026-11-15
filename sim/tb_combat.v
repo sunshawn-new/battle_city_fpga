@@ -184,12 +184,14 @@ module tb_combat;
         kill_enemy(2);
         check_int("C07c armor kill -> +300",   u_top.score100, 6);
 
-        // ---------------- C08 敌人全灭 -> VICTORY ----------------
+        // ---------------- C08 本关打完 -> STAGE CLEAR 横幅 ----------------
+        // 关卡判定（队列空 + 场上没人）在 stage_ctrl 里，tb_stage 专门测它；
+        // 这里只验 top 把这个信号一路接到了 HUD 的横幅上。
         do_reset;
-        force u_top.enemy_valid = 3'b000;
+        force u_top.u_stage_ctrl.stage_clear = 1'b1;
         repeat (4) @(posedge clock);
-        check_int("C08a victory when all enemies gone", u_top.victory, 1);
-        release u_top.enemy_valid;
+        check_int("C08a stage clear banner reaches HUD", u_top.u_vga.hud_victory, 1);
+        release u_top.u_stage_ctrl.stage_clear;
 
         // ---------------- C09 敌人被击毁 -> 在死亡位置开一个爆炸 ----------------
         // 爆炸槽 3 是“一键分配”里的最高槽（只有这一个请求时一定落在槽 3）。

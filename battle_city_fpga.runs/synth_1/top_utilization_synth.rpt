@@ -1,7 +1,7 @@
 Copyright 1986-2021 Xilinx, Inc. All Rights Reserved.
 -------------------------------------------------------------------------------------------------
 | Tool Version : Vivado v.2021.1 (win64) Build 3247384 Thu Jun 10 19:36:33 MDT 2021
-| Date         : Sat Nov 14 20:14:07 2026
+| Date         : Sun Nov 15 11:07:48 2026
 | Host         : LAPTOP-8QJD8CCP running 64-bit major release  (build 9200)
 | Command      : report_utilization -file top_utilization_synth.rpt -pb top_utilization_synth.pb
 | Design       : top
@@ -30,14 +30,14 @@ Table of Contents
 +-------------------------+------+-------+------------+-----------+-------+
 |        Site Type        | Used | Fixed | Prohibited | Available | Util% |
 +-------------------------+------+-------+------------+-----------+-------+
-| Slice LUTs*             | 3882 |     0 |          0 |     20800 | 18.66 |
-|   LUT as Logic          | 3882 |     0 |          0 |     20800 | 18.66 |
+| Slice LUTs*             | 4187 |     0 |          0 |     20800 | 20.13 |
+|   LUT as Logic          | 4187 |     0 |          0 |     20800 | 20.13 |
 |   LUT as Memory         |    0 |     0 |          0 |      9600 |  0.00 |
-| Slice Registers         | 1594 |     0 |          0 |     41600 |  3.83 |
-|   Register as Flip Flop | 1594 |     0 |          0 |     41600 |  3.83 |
+| Slice Registers         | 1790 |     0 |          0 |     41600 |  4.30 |
+|   Register as Flip Flop | 1790 |     0 |          0 |     41600 |  4.30 |
 |   Register as Latch     |    0 |     0 |          0 |     41600 |  0.00 |
-| F7 Muxes                |   23 |     0 |          0 |     16300 |  0.14 |
-| F8 Muxes                |    1 |     0 |          0 |      8150 |  0.01 |
+| F7 Muxes                |   39 |     0 |          0 |     16300 |  0.24 |
+| F8 Muxes                |    5 |     0 |          0 |      8150 |  0.06 |
 +-------------------------+------+-------+------------+-----------+-------+
 * Warning! The Final LUT count, after physical optimizations and full implementation, is typically lower. Run opt_design after synthesis, if not already completed, for a more realistic count.
 
@@ -56,8 +56,8 @@ Table of Contents
 | 0     |          Yes |           - |            - |
 | 0     |          Yes |           - |          Set |
 | 0     |          Yes |           - |        Reset |
-| 154   |          Yes |         Set |            - |
-| 1440  |          Yes |       Reset |            - |
+| 146   |          Yes |         Set |            - |
+| 1644  |          Yes |       Reset |            - |
 +-------+--------------+-------------+--------------+
 
 
@@ -152,23 +152,23 @@ Table of Contents
 +----------+------+---------------------+
 | Ref Name | Used | Functional Category |
 +----------+------+---------------------+
-| FDRE     | 1440 |        Flop & Latch |
-| LUT6     | 1296 |                 LUT |
-| LUT2     | 1076 |                 LUT |
-| LUT4     |  985 |                 LUT |
-| LUT5     |  760 |                 LUT |
-| CARRY4   |  502 |          CarryLogic |
-| LUT3     |  459 |                 LUT |
-| LUT1     |  182 |                 LUT |
-| FDSE     |  154 |        Flop & Latch |
+| FDRE     | 1644 |        Flop & Latch |
+| LUT6     | 1389 |                 LUT |
+| LUT2     | 1181 |                 LUT |
+| LUT4     | 1118 |                 LUT |
+| LUT5     |  728 |                 LUT |
+| CARRY4   |  545 |          CarryLogic |
+| LUT3     |  500 |                 LUT |
+| LUT1     |  271 |                 LUT |
+| FDSE     |  146 |        Flop & Latch |
+| MUXF7    |   39 |               MuxFx |
 | DSP48E1  |   34 |    Block Arithmetic |
-| MUXF7    |   23 |               MuxFx |
 | OBUF     |   14 |                  IO |
 | IBUF     |    7 |                  IO |
 | RAMB18E1 |    5 |        Block Memory |
+| MUXF8    |    5 |               MuxFx |
 | RAMB36E1 |    4 |        Block Memory |
 | BUFG     |    2 |               Clock |
-| MUXF8    |    1 |               MuxFx |
 +----------+------+---------------------+
 
 
@@ -183,6 +183,7 @@ Table of Contents
 | blk_mem_tank_destroyed2 |    1 |
 | blk_mem_tank_destroyed1 |    1 |
 | blk_mem_tank_armor      |    1 |
+| blk_mem_level           |    1 |
 | blk_mem_hq_destroyed    |    1 |
 | blk_mem_headquarters    |    1 |
 | blk_mem_bullet          |    1 |

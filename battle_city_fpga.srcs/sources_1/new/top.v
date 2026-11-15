@@ -24,7 +24,12 @@ module top #(
     parameter ENEMY_FIRE = 1,
     // 爆炸动画：每个相位多少拍（100MHz -> 80ms），一共 6 个相位 = 480ms
     // （前 3 个相位放"亮爆团"，后 3 个放"星形环"）。仿真里改小。
-    parameter FX_DIV = 8_000_000
+    parameter FX_DIV = 8_000_000,
+    // ---------------- 关卡 / 波次（stage_ctrl.v）----------------
+    parameter N_LEVELS          = 4,        // 一共几关（levels.coe 里有几关）
+    parameter ENEMIES_PER_STAGE = 20,       // 每关要打多少辆（波次总数）
+    parameter SPAWN_CYCLES      = 300_000_000,  // 补一辆车的间隔：3s @100MHz
+    parameter CLEAR_CYCLES      = 200_000_000   // STAGE CLEAR 横幅停留：2s
 )(
     input clock,       // 100MHz
     input reset,
@@ -58,16 +63,33 @@ module top #(
     //               因为分数永远是 100 的倍数，HUD 直接用十进制显示 nn00，
     //               省掉一个 16 位 /10 除法器（见 hud.v 的说明）
     //   game_over : 基地被打爆 或 生命耗尽，锁存（本工程没有重开一局）
-    //   victory   : 三辆敌人全部被击毁
+    //   level     : 关卡号（1..N_LEVELS），由 stage_ctrl 维护，HUD 显示 LEVEL n
+    //   stage_clear : 本关打完（显示 STAGE CLEAR 横幅 2s，然后换下一关）
     reg [1:0] lives     = LIVES_START;
     reg [3:0] score100  = 4'd0;
     reg       game_over = 1'b0;
-    reg       victory   = 1'b0;
     reg [27:0] invuln_cnt = 28'd0;     // 复活无敌倒计时
     reg        respawn_pulse = 1'b0;
     wire       player_invuln = (invuln_cnt != 28'd0);
     wire       player_alive  = ~game_over & ~player_invuln;
-    wire       freeze        = game_over;   // GAME OVER 后玩家/敌人都不再动
+
+    // ---------------- 关卡流程（stage_ctrl.v）----------------
+    wire [2:0]           level;             // 当前关卡号
+    wire [N_ENEMY-1:0]   enemy_spawn;       // 单拍：往第 i 槽放一辆新车
+    wire [N_ENEMY*2-1:0] enemy_spawn_type;  // 新车的兵种
+    wire [5:0]           enemies_left;      // 本关还剩多少辆（HUD）
+    wire                 stage_clear;       // STAGE CLEAR 横幅期间 = 1
+    wire                 stage_paused;      // 横幅 / 装载地图期间 = 1
+    wire                 lvl_load_start;    // 单拍：让 level_loader 开始装载
+    wire [2:0]           lvl_load_level;    // 要装哪一关
+    wire                 lvl_load_done;     // 单拍：装载完成
+    wire                 lvl_respawn;       // 单拍：玩家回出生点（每关开局）
+
+    // paused 期间：玩家/敌人/炮弹全停，probe 复位（装载地图时不能有人查地图）
+    wire freeze     = game_over | stage_paused;
+    wire probe_rst  = reset | stage_paused;
+    wire bullet_rst = reset | stage_paused;
+    wire player_respawn = respawn_pulse | lvl_respawn;
 
     player #(
         .MOVE_DIV(MOVE_DIV), .TILE(TILE),
@@ -79,7 +101,7 @@ module top #(
         .position_x(player_x), .position_y(player_y),
         .terrain_in_front(player_terrain_in_front),
         .terrain_valid(terrain_valid),
-        .respawn(respawn_pulse), .freeze(freeze),
+        .respawn(player_respawn), .freeze(freeze),
         .move_tick(move_tick)
     );
 
@@ -129,7 +151,7 @@ module top #(
         .MAP_W(MAP_W), .MAP_H(MAP_H), .TILE(TILE),
         .TANK_W(TANK_W), .TANK_H(TANK_H)
     ) u_probe (
-        .clock(clock), .reset(reset),
+        .clock(clock), .reset(probe_rst),
         .x(player_x), .y(player_y), .dir(player_direction),
         .refresh(move_tick),
         .map_req(probe_req), .map_addr(probe_addr), .map_gnt(p_gnt[0]),
@@ -159,7 +181,7 @@ module top #(
                 .MAP_W(MAP_W), .MAP_H(MAP_H), .TILE(TILE),
                 .TANK_W(TANK_W), .TANK_H(TANK_H)
             ) u_probe (
-                .clock(clock), .reset(reset),
+                .clock(clock), .reset(probe_rst),
                 .x(enemy_x[ge*10 +: 10]), .y(enemy_y[ge*10 +: 10]),
                 .dir(enemy_dir[ge*2 +: 2]),
                 .refresh(enemy_move_tick[ge]),
@@ -187,6 +209,7 @@ module top #(
         .MOVE_DIV(MOVE_DIV * 2), .TURN_TICKS(TURN_TICKS), .FIRE_TICKS(FIRE_TICKS)
     ) u_enemy_ctrl (
         .clock(clock), .reset(reset),
+        .spawn(enemy_spawn), .spawn_type(enemy_spawn_type),
         .terrain_front(enemy_terrain_front),
         .terrain_valid(enemy_terrain_valid),
         .move_tick(enemy_move_tick),
@@ -217,7 +240,7 @@ module top #(
         .BW(10), .BH(10),
         .MAP_W(MAP_W), .MAP_H(MAP_H), .TILE(TILE)
     ) u_bullet_ctrl (
-        .clock(clock), .reset(reset),
+        .clock(clock), .reset(bullet_rst),
         .fire_btn(btn_fire),
         .player_alive(player_alive),
         .freeze(freeze),
@@ -251,11 +274,11 @@ module top #(
         .fx_valid(fx_valid), .fx_x(fx_x), .fx_y(fx_y), .fx_frame(fx_frame)
     );
 
-    // ---- 打法状态机：基地 / 生命 / 分数 / 胜负（全部锁存在 top）----
+    // ---- 打法状态机：基地 / 生命 / 分数（全部锁存在 top）----
     // 放在 top 而不是 vga：vga 只决定“画哪张贴图”，这些是系统状态。
     //   · 基地被打中一次 -> base_alive=0（白旗贴图）+ game_over
     //   · 玩家被打中 -> 扣一条命 + 回到出生点 + 一段无敌时间；命没了 -> game_over
-    //   · 三辆敌人全灭 -> victory（本工程只有一关，没有下一关）
+    //   · 敌人全灭 / 关卡推进 -> 归 stage_ctrl.v 管（见它的注释）
     // game_over 之后 freeze=1：玩家和敌人都不再移动/开火（画面定格）。
     reg [1:0] kill_pts;
     reg       kill_any;
@@ -280,7 +303,6 @@ module top #(
             lives         <= LIVES_START;
             score100      <= 4'd0;
             game_over     <= 1'b0;
-            victory       <= 1'b0;
             invuln_cnt    <= 28'd0;
             respawn_pulse <= 1'b0;
         end else begin
@@ -292,10 +314,6 @@ module top #(
             end
 
             if (kill_any) score100 <= score100 + {2'b0, kill_pts};
-
-            // 敌人全灭 -> 胜利（只在还没输的时候点亮）
-            if (!game_over && (enemy_valid == {N_ENEMY{1'b0}}))
-                victory <= 1'b1;
 
             // 玩家中弹：扣命 -> 复活 + 无敌；最后一条命就 GAME OVER
             if (b_hit_player && player_alive) begin
@@ -314,12 +332,59 @@ module top #(
     end
 
     // ---- 仲裁器：N_PROBE 个地形查询客户端 + 1 个炮弹客户端 ----
+    wire [14:0] bus_addra;
+    wire        bus_wea;
+    wire [3:0]  bus_dina;
+
     map_bus #(.N_PROBE(N_PROBE)) u_map_bus (
         .clock(clock), .reset(reset),
         .p_req(p_req), .p_addr(p_addr), .p_gnt(p_gnt),
         .b_req(b_req), .b_we(b_we), .b_addr(b_addr), .b_din(b_din), .b_gnt(b_gnt),
-        .ram_addra(ram_addra), .ram_wea(ram_wea), .ram_dina(ram_dina)
+        .ram_addra(bus_addra), .ram_wea(bus_wea), .ram_dina(bus_dina)
     );
+
+    // ---- 关卡推进 / 敌人波次 ----
+    stage_ctrl #(
+        .N_E(N_ENEMY), .N_LEVELS(N_LEVELS),
+        .ENEMIES_PER_STAGE(ENEMIES_PER_STAGE),
+        .SPAWN_CYCLES(SPAWN_CYCLES), .CLEAR_CYCLES(CLEAR_CYCLES)
+    ) u_stage_ctrl (
+        .clock(clock), .reset(reset),
+        .game_over(game_over),
+        .e_valid(enemy_valid), .load_done(lvl_load_done),
+        .spawn(enemy_spawn), .spawn_type(enemy_spawn_type),
+        .level(level), .enemies_left(enemies_left),
+        .stage_clear(stage_clear), .load_start(lvl_load_start),
+        .load_level(lvl_load_level), .respawn(lvl_respawn),
+        .paused(stage_paused)
+    );
+
+    // ---- 关卡地图装载器 + 关卡 ROM ----
+    // 装载期间 paused=1：probe/炮弹都被复位，没人查地图，Port A 写口归它独占。
+    wire [11:0] ldr_rom_addr;
+    wire [3:0]  ldr_rom_dout;
+    wire [14:0] ldr_addr;
+    wire [3:0]  ldr_din;
+    wire        ldr_we;
+    wire        ldr_busy;
+
+    level_loader #(
+        .MAP_W(MAP_W), .HQ_X0(56), .HQ_Y0(112), .HQ_W(8), .HQ_H(6)
+    ) u_level_loader (
+        .clock(clock), .reset(reset),
+        .start(lvl_load_start), .level(lvl_load_level),
+        .ld_quiet(~(|p_req) & ~b_req),      // 总线确实空闲才动手（兜底）
+        .rom_addr(ldr_rom_addr), .rom_dout(ldr_rom_dout),
+        .wr_addr(ldr_addr), .wr_din(ldr_din), .wr_we(ldr_we),
+        .busy(ldr_busy), .done(lvl_load_done)
+    );
+
+    blk_mem_level u_level_rom (
+        .clka (clock),
+        .addra(ldr_rom_addr),      // 4096 x 4：每关 1024 项（30x30 块图）
+        .douta(ldr_rom_dout)
+    );
+
     vga #(.N_B(N_BULLET), .N_E(N_ENEMY), .N_FX(N_FX)) u_vga(
         .clock(clock), .reset(reset),
         .position_x(player_x), .position_y(player_y),
@@ -338,17 +403,26 @@ module top #(
         // ---- HUD：右侧 200px 信息栏 ----
         .hud_score100(score100),
         .hud_lives({1'b0, lives}),
-        .hud_level(3'd1),
+        .hud_level(level),
+        .hud_enemy_left(enemies_left),
         .hud_game_over(game_over),
-        .hud_victory(victory)
+        .hud_victory(stage_clear)
     );
+
+    // ---- 地图 Port A 写口仲裁：关卡装载器优先 ----
+    // 装载时整条总线是停的（probe/炮弹都被 paused 复位），所以这里只需要一个
+    // 简单的二选一：loader 在写就用它的地址/数据，否则全听 map_bus 的。
+    assign ram_addra = ldr_we ? ldr_addr : bus_addra;
+    assign ram_wea   = ldr_we | bus_wea;
+    assign ram_dina  = ldr_we ? ldr_din  : bus_dina;
 
     blk_mem_gen_0 u_map_ram (
         // ========== Port A (系统总线：地形查询 / 炮弹命中与打砖，由 map_bus 仲裁) ==========
+        // 装载关卡时对整张地图做 14400 次写（loader 独占），其余时间只有炮弹打砖会写。
         .clka  (clock),
-        .wea   (ram_wea),         // 只有炮弹打掉砖块时才会为 1
-        .addra (ram_addra),       // map_bus 选出的客户端地址
-        .dina  (ram_dina),        // 打砖时写 0（空地）
+        .wea   (ram_wea),         // = loader 的写 | 炮弹打砖
+        .addra (ram_addra),       // loader 装载时指向它的地址，否则是 map_bus 选出的客户端地址
+        .dina  (ram_dina),        // 装载时是块展开后的 tile_id；打砖时写 0（空地）
         .douta (ram_douta),       // 读出的一格地形（广播给所有客户端）
 
         // ========== Port B (VGA 渲染：纯粹只读) ==========

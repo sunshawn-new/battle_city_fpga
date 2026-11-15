@@ -239,14 +239,31 @@ module tb_hud;
         repeat (20) @(posedge clock);
         check_int("H11d game over cleared by reset", u_top.game_over, 0);
 
-        // VICTORY 横幅（同样的区域、不同的字）
-        force u_top.victory = 1'b1;
+        // VICTORY -> STAGE CLEAR 横幅（同样的区域、更长的字，从 X0+12 开始排）
+        force u_top.u_stage_ctrl.stage_clear = 1'b1;
         repeat (4) @(posedge clock);
-        probe(640, 300);
-        check_int("H12a victory banner row", u_top.u_vga.u_hud.li, 9);
-        count_color(640, 723, 300, 313, 12'hFFF, cnt);
-        check_ge("H12b VICTORY text drawn", cnt, 60);
-        release u_top.victory;
+        probe(612, 300);
+        check_int("H12a stage clear banner row", u_top.u_vga.u_hud.li, 9);
+        count_color(612, 787, 300, 313, 12'hFFF, cnt);
+        check_ge("H12b STAGE CLEAR text drawn", cnt, 200);
+        release u_top.u_stage_ctrl.stage_clear;
+
+        // ---------------- H14 ENEMY nn：本关剩余敌人（两位十进制）----------------
+        // 直接看 hud 里选出来的字符（ch 是组合的 ASCII），比数像素精确得多。
+        force u_top.u_vga.hud_enemy_left = 6'd17;
+        repeat (4) @(posedge clock);
+        probe(710, 79);
+        check_int("H14a ENEMY tens '1'",  u_top.u_vga.u_hud.ch, 8'h31);
+        probe(726, 79);
+        check_int("H14b ENEMY units '7'", u_top.u_vga.u_hud.ch, 8'h37);
+
+        force u_top.u_vga.hud_enemy_left = 6'd20;
+        repeat (4) @(posedge clock);
+        probe(710, 79);
+        check_int("H14c ENEMY tens '2'",  u_top.u_vga.u_hud.ch, 8'h32);
+        probe(726, 79);
+        check_int("H14d ENEMY units '0'", u_top.u_vga.u_hud.ch, 8'h30);
+        release u_top.u_vga.hud_enemy_left;
 
         // ---------------- H13 爆炸图层：包围盒命中 / 地址 / 帧选择 ----------------
         // 贴图 ROM 的桩返回全 0（透明），所以这里不看颜色，只看 vga.v 的命中与地址：

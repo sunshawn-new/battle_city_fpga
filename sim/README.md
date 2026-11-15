@@ -10,11 +10,12 @@
 | `tb_terrain.v` | 地形测试台：24 条断言，覆盖四方向移动、砖/钢/河/树林/基地/切角/河与浅滩、**坐标永远在 5px 格点上**、以及**地图契约**（基地本体 8x6 必须正好在格 (56,112)、出生点净空） |
 | `tb_bullet.v` | 炮弹测试台：88 条断言，覆盖发射/冷却/飞行/命中/打砖洞（20x10）/出界/对象池/总线仲裁/贴墙开火/连续打洞/打中基地（`base_hit` 单拍），以及本轮新增的**敌人开火 / 打中坦克 / 友军不误伤 / 弹对弹同归于尽 / 每发射者同屏 1 发 / GAME OVER 冻结** |
 | `tb_enemy.v` | 敌方坦克测试台：38 条断言，覆盖出生点/兵种（`e_type`）/整格移动/三个 probe 不串台/撞墙转向/4 客户端抢总线/长跑不压墙，以及**兵种速度（200/400/600 拍）、开火周期（6/4/8 节拍）、装甲挨两发、击毁脉冲、GAME OVER 冻结** |
-| `tb_combat.v` | 关卡流程测试台：28 条断言，覆盖生命 3→0、复活回出生点、复活无敌、命耗尽/基地被打爆 -> GAME OVER、分数 100/200/300、敌人全灭 -> VICTORY，以及**击毁 -> 爆炸开在坦克位置 / 6 个相位后自动释放**、**玩家中弹 -> 爆炸开在死亡位置（不是复活点）** |
-| `tb_hud.v` | 侧栏测试台：34 条断言，覆盖 x=600 边界、面板底色/2px 分界线、标题/关卡/标签字形真的画出来、**字形 2 倍放大的亮/暗像素**、分数/生命数字随状态变化、敌人图标的位置/兵种、GAME OVER / VICTORY 横幅，以及**爆炸图层的包围盒/ROM 地址/帧选择**（H13） |
+| `tb_combat.v` | 关卡流程测试台：28 条断言，覆盖生命 3→0、复活回出生点、复活无敌、命耗尽/基地被打爆 -> GAME OVER、分数 100/200/300、**本关打完的 STAGE CLEAR 横幅一路接到 HUD**，以及**击毁 -> 爆炸开在坦克位置 / 6 个相位后自动释放**、**玩家中弹 -> 爆炸开在死亡位置（不是复活点）** |
+| `tb_hud.v` | 侧栏测试台：38 条断言，覆盖 x=600 边界、面板底色/2px 分界线、标题/关卡/标签字形真的画出来、**字形 2 倍放大的亮/暗像素**、分数/生命数字随状态变化、敌人图标的位置/兵种、**`ENEMY nn` 剩余数两位十进制**、GAME OVER / STAGE CLEAR 横幅，以及**爆炸图层的包围盒/ROM 地址/帧选择**（H13） |
 | `tb_fx.v` | 爆炸特效测试台：30 条断言，覆盖 4 个槽的**同拍多请求分配**（3 敌 + 玩家全死不丢帧）、坐标绑定、6 个相位的**两帧切换点**（相位 2/3 边界）、**满池丢弃**（不覆盖正在放的爆炸）、放完自动释放 + 复用、放到一半复位、两个槽相位互不干扰 |
-| `bram_stubs.v` | `blk_mem_gen_0`（地图）和 12 个贴图 ROM（含 `blk_mem_bullet` / `blk_mem_headquarters` / 3 种兵种 / `blk_mem_hq_destroyed` / 爆炸两帧 `blk_mem_tank_destroyed1|2`）的行为级模型 |
-| `run_sim.ps1` | 一键跑仿真：转换地图、用 4 种 BRAM 读延迟各编译运行三套用例 |
+| `tb_stage.v` | 关卡与波次测试台：43 条断言，覆盖**开局排一屏 3 辆（F/P/A）**、击毁后**等计时器到点才补车**、兵种队列、**本关打完 -> STAGE CLEAR 横幅 + 暂停**、**换关时把整张地图重写成第 2 关**（河道/钢板/基地台座/右下角最后一格逐格对照）、新关开局（玩家回出生点 + 敌人重新排屏）、**GAME OVER 后不再补车**、**打完第 4 关回到第 1 关** |
+| `bram_stubs.v` | `blk_mem_gen_0`（地图）、`blk_mem_level`（关卡块图）和 12 个贴图 ROM（含 `blk_mem_bullet` / `blk_mem_headquarters` / 3 种兵种 / `blk_mem_hq_destroyed` / 爆炸两帧 `blk_mem_tank_destroyed1|2`）的行为级模型 |
+| `run_sim.ps1` | 一键跑仿真：把 `map.coe` / `levels.coe` 转成 hex、用 4 种 BRAM 读延迟各编译运行全部 7 套用例 |
 | `build_all.tcl` | 用工程流重新 synth + impl + 生成 bit，并把报告写到 `build_report.txt` |
 | `add_bullet_ip.tcl` | 一次性脚本：把 `terrain_probe.v`/`map_bus.v` 和 `blk_mem_bullet` IP 并进工程 |
 | `add_hq_ip.tcl` | 一次性脚本：新建 `blk_mem_headquarters` IP，并让坦克 ROM 重新读新的金色 coe |
@@ -150,45 +151,45 @@
   地图里 `tile_id == 5` 不被改写、之后的炮弹仍然能打砖）；
   `img/preview.py --hq-destroyed` 可以离线看废墟那一帧（`img/preview_destroyed.png`）。
 
-## 地图：关卡文件 -> `map.coe`
+## 地图：关卡文件 -> `map.coe` + `levels.coe`
 
 地图是画出来的，不是手写的 19200 个数：
 
 ```
-pysrc/maps/level1.txt   40 列 x 30 行 ASCII，一个字符 = 1 块
-        │               '.' 空  '#' 砖  'S' 钢  '~' 河  'T' 树  'H' 基地
-        │  python pysrc\map_generator.py
-        ▼
-map.coe                 160x120 格 = 19200 个 tile_id（16 进制）
-        │  build_all.tcl -> blk_mem_gen_0 的 .mif
-        ▼
-板上                     vga.v 每 5x5 像素读一次
+pysrc/maps/level1..4.txt   30 列 x 30 行 ASCII，一个字符 = 1 块
+        │                  '.' 空  '#' 砖  'S' 钢  '~' 河  'T' 树  'H' 基地
+        │  python pysrc\gen_levels.py
+        ├──► map.coe       第 1 关展开后的 120x120 格 -> blk_mem_gen_0（地图 RAM 的上电初值）
+        └──► levels.coe    4 关的 30x30 块图 -> blk_mem_level（换关时由 level_loader.v
+                           展开成 14400 格写回地图 RAM，见“第九轮”）
 ```
 
 坐标系（三套，别混）：
 
 | 单位 | 大小 | 换算 |
 | --- | --- | --- |
-| 像素 | 800x600 | 坦克 20x20、贴图 20x20 |
-| 格 | 160x120 | 1 格 = 5x5 像素；坦克 = 4x4 格 |
-| 块（关卡文件里一个字符） | 40x30 | 1 块 = 4x4 格 = 20x20 像素 |
+| 像素 | 800x600（左 600 是玩区、右 200 是 HUD） | 坦克 20x20、贴图 20x20 |
+| 格 | 120x120 | 1 格 = 5x5 像素；坦克 = 4x4 格 |
+| 块（关卡文件里一个字符） | 30x30 | 1 块 = 4x4 格 = 20x20 像素 |
 
 块 `(bx, by)` 覆盖格 `x = 4bx..4bx+3`、`y = 4by..4by+3`，即像素 `(20bx, 20by)` 起的
 20x20 方块 —— 墙厚正好一块，贴图不会被切断；炮弹打掉 20x10 刚好半块。
 
-`map_generator.py` 写 `map.coe` 之前会自己校验，不通过就退出、不留半成品：
+`gen_levels.py` 会对每一关跑完整的校验，不通过就退出、不留半成品：
 
-1. 基地本体必须**正好**是格 `列 76~83 x 行 112~117`（8x6）。因为 `vga.v` 的
-   `HQ_X0/HQ_Y0 = 390/565` 是按这个包围盒写死画精灵的；整张图不许有第二处 tile 5。
-2. 玩家出生点 `(400,300)` 及上下各 60px 的通道必须空（否则一开局就“空气墙”）。
-3. 三个敌人出生点 `(40,10)/(380,10)/(740,10)` 及其正下方 20px 必须空。
+1. 基地本体必须**正好**是格 `列 56~63 x 行 112~117`（8x6）。因为 `vga.v` 的
+   `HQ_X0/HQ_Y0 = 290/565` 是按这个包围盒写死画精灵的；整张图不许有第二处 tile 5。
+2. 玩家出生点 `(300,300)` 及上下各 60px 的通道必须空（否则一开局就“空气墙”）。
+3. 三个敌人出生点 `(40,10)/(300,10)/(560,10)` 及其正下方 20px 必须空。
 4. 从玩家出生点 BFS：三个敌人出生点、基地堡垒左上/右上/上方都要能走到
    （否则关卡是死的）。
+5. 硬件展开规则（`level_loader.v` 那套“块 -> 4x4 格、'H' 块补砖”）必须和
+   `map_generator.expand()` 逐格一致 —— 两边各算一遍再比对。
 
 ```powershell
-python pysrc\map_generator.py            # 校验并重写 map.coe
-python pysrc\map_generator.py --ascii    # 只在终端打印关卡，看对称/留白
-python img\preview.py                    # 渲染 img/preview.png 看实际画面
+python pysrc\gen_levels.py               # 校验 4 关 + 重写 levels.coe 和 map.coe（第 1 关）
+python pysrc\map_generator.py --ascii     # 只在终端打印第 1 关，看对称/留白
+python img\preview.py                     # 渲染 img/preview.png 看实际画面
 ```
 
 > **测试台不再绑定地图内容。** `tb_terrain` 分成两类用例：
@@ -205,18 +206,22 @@ cd sim
 
 脚本会做三件事：
 
-1. 把工程根目录的 `map.coe` 转成 `map_mem.hex`，`bram_stubs.v` 用 `$readmemh`
-   加载 —— 仿真的就是板子里那张真地图，所以地形用例的期望值能和上板行为对上
-   （`tb_bullet` 开始时会把整张地图清 0，自己 `poke` 需要的格子，与 `map.coe` 无关）。
+1. 把工程根目录的 `map.coe` / `levels.coe` 转成 `map_mem.hex` / `levels_mem.hex`，
+   `bram_stubs.v` 用 `$readmemh` 加载 —— 仿真的就是板子里那两张真表，所以地形/换关
+   用例的期望值能和上板行为对上（`tb_bullet` 开始时会把整张地图清 0，自己 `poke`
+   需要的格子，与 `map.coe` 无关）。
 2. 用 `-d BRAM_LATENCY_0/2/3`（不加宏就是真 IP 的 1 拍）分别编译运行
-   `tb_terrain` / `tb_bullet` / `tb_enemy` / `tb_combat` / `tb_hud` / `tb_fx`。这样能证明
-   `map_bus` + 扫描引擎不依赖 BRAM 的具体读延迟（`xvlog` 在这个版本里不支持
+   `tb_terrain` / `tb_bullet` / `tb_enemy` / `tb_combat` / `tb_hud` / `tb_fx` / `tb_stage`。
+   这样能证明 `map_bus` + 扫描引擎不依赖 BRAM 的具体读延迟（`xvlog` 在这个版本里不支持
    `-d NAME=VALUE`，`=VALUE` 会被当成文件名，所以用宏名来选值）。
-3. 打印 `PASSED/FAILED` 汇总；任何一个配置不是 24/88/38/28/34/30 全过就以退出码 1 结束。
+3. 打印 `PASSED/FAILED` 汇总；任何一个配置不是 24/88/38/28/38/30/43 全过就以退出码 1 结束。
 
 仿真里参数都改小了以加速：`top` 的 `MOVE_DIV` = 200（板上 4_000_000）、
 `SPEED_DIV` = 64、`COOLDOWN` = 200、`DB_MAX` = 4、`FX_DIV` = 8（板上 8_000_000，
 爆炸每个相位 80ms）。`tb_fx` 更直接：直接实例化 `fx_ctrl`，`FX_DIV` = 8。
+`tb_stage` 还把关卡参数压到 `ENEMIES_PER_STAGE` = 4、`SPAWN_CYCLES` = 400 拍、
+`CLEAR_CYCLES` = 60 拍（板上 20 辆 / 3s / 2s），一套用例 34 万拍就能把
+“开局 -> 补车 -> 全灭 -> STAGE CLEAR -> 装载下一关 -> 循环”跑完。
 注意 `SPEED_DIV` 必须大于一次扫描的耗时（4 格 ≈ 28 拍），否则两次扫描会叠在
 一起，“没换格就不读地图”的去重就测不准。
 坦克仍然是【整格移动】：`tb_terrain` 的 `step_ticks(n)` 表示“走 n 像素”，
@@ -857,4 +862,150 @@ LUT 的 325 增量是：4 个爆炸槽的分配/相位计数器（约 180）、v
 > 写测试台时的坑：在 `@(posedge clock)` 的同一时间点 `$display` 信号，读到的是
 > **打拍之前**的值（NBAs 还没生效），整个用例会差一拍。`tb_fx` 的 `wait_clk` 一律在
 > negedge 返回，相位边界才数得准（相位 2 -> 3 正好是第 24 拍）。
+
+
+## 第九轮：关卡切换 + 敌人波次（2026-11-15）
+
+前八轮做完之后，游戏有一个很直白的死结：**打赢三辆敌人之后就没东西可打了**
+（`victory` 是锁存的一次性信号），而“一关只有三辆车”也不像 Battle City。
+这一轮补上两块：
+
+* **关卡切换**：4 张关卡地图、`STAGE CLEAR` 横幅、换关时把整张地图重写一遍、
+  打完第 4 关回到第 1 关（无限循环，分数和生命都不清零）；
+* **敌人波次**：每关 20 辆，开局先排一屏 3 辆，之后每 3 秒补一辆，
+  兵种按关卡队列出（前一关轻、后一关重）。
+
+### 结构：谁管什么
+
+```
+top
+ ├─ stage_ctrl     关卡号 / 剩余队列 / 补车计时 / STAGE CLEAR -> 换关
+ │    ├─ spawn[i] + spawn_type[i]  ──► enemy_ctrl（第 i 槽按兵种“上车”）
+ │    ├─ paused  ──► 冻结玩家/敌人/炮弹 + 复位 terrain_probe
+ │    └─ load_start / load_level ──► level_loader
+ ├─ level_loader   块图 -> 地图 RAM（14400 次写，0.16ms）
+ │    └─ blk_mem_level（4096x4 = 4 关 x 1024 项）
+ └─ hud            LEVEL n / ENEMY nn / STAGE CLEAR
+```
+
+`enemy_ctrl` 从“复位后固定 3 辆、兵种写死在 generate 里”改成
+“复位后所有槽都是空的，等 `spawn` 派车”。兵种不再是 `localparam`，而是每个槽的
+寄存器（`my_type / step / fire_period / hp_max`），`spawn` 那一拍按队列写进去
+—— 同一个槽前后可以是不同兵种，这正是“波次换车”需要的。
+
+### 为什么 ROM 里存“块图”而不是整张地图
+
+| 方案 | 容量 | BRAM36 |
+| --- | --- | --- |
+| 每关存 120x120 格（14400 x 4 位） | 57600 位/关 | 4 关约 8 个 |
+| 每关存 30x30 块（900 x 4 位） | 3600 位/关 | 4 关 **不到 1 个 BRAM18** |
+
+展开规则只有一条：一块 -> 4x4 格，`'H'` 块里落在基地矩形（格 56..63 x 112..117）
+的格子是 5、其余补砖（基地坐在砖砌台座上）。硬件上一次 14400 次写 ≈ 0.16 ms，
+比一次屏幕刷新还短，换关时玩区连闪一下都看不出来。
+`level_loader.v` 每块花 18 拍：1 拍送地址 + 1 拍收 1 拍读延迟的数据 + 16 拍写。
+
+> **三道保险**：`gen_levels.py` 用 Python 把“硬件展开规则”和
+> `map_generator.expand()` 逐格比对；`tb_stage` 再把换关后地图 RAM 里的真实内容
+> 按坐标抽查（河道消失 / 钢板出现 / 基地台座是砖 / 基地本体是 5）；`check_mif.py`
+> 再确认 `levels.coe` 真的进了 IP 的 `.mif`。
+
+### 关卡流程（stage_ctrl 的三个状态）
+
+| 状态 | 做什么 | 什么时候走 |
+| --- | --- | --- |
+| `S_PLAY` | 补车 / 判胜负 | 队列空 **且** 场上一辆不剩 -> `S_CLEAR` |
+| `S_CLEAR` | 出 `STAGE CLEAR` 横幅，`paused=1` 冻结全场 | 等 `CLEAR_CYCLES`（2s）-> `S_LOAD` |
+| `S_LOAD` | 等 `level_loader.done` | 装载完成 -> `level` 换新、队列重置、玩家回出生点 -> `S_PLAY` |
+
+补车规则（`spawn_now`）：本关前 3 辆**立刻**排满一屏（开局就是 3 辆，和以前一致），
+之后必须等 `spawn_timer` 到 0 才补 —— 所以是“**按时间顺序**刷新出更多敌人”，
+而不是“死了立刻重生”的无尽打地鼠。
+
+兵种队列（`type_of`）：前 3 辆固定 快速/火力/装甲（让玩家先看清三种车，
+也正好等于旧版“左快 / 中火 / 右装”），后面 17 辆按关卡配比出：
+
+| 关卡 | 快速 | 火力 | 装甲 | 地图风格 |
+| --- | --- | --- | --- | --- |
+| 1 | 10 | 5 | 2 | 一条横贯东西的河 + 两处浅滩（原始地图） |
+| 2 | 6 | 7 | 4 | 中央宽河、两个口袋，逼近距离交战 |
+| 3 | 3 | 6 | 8 | 2 块高的砖墙网格迷宫，奖励“堵口” |
+| 4 | 1 | 4 | 12 | 钢板多、掩体少的开阔地，重装为主 |
+
+### 三个容易踩的点
+
+1. **`e_valid` 比 `spawn` 晚一拍。**
+   `spawn` 是寄存器输出，槽里的坦克要到下一个时钟沿才出现在 `e_valid` 上。
+   所以挑空槽必须用 `slot_busy = e_valid | spawn`，否则“开局排一屏”会连着两拍
+   派给同一个槽（第一版就是这么错的：只有 2 辆出场、兵种整体错位）。
+   同理，“本关打完”也要用 `slot_busy` —— 不然最后一辆刚派出去的那一拍
+   `e_valid` 还是 0，会被误判成全灭、直接跳到 STAGE CLEAR。
+   > 同类坑还有一个（`level_loader` 里）：最后一块的最后一个写周期如果顺手把
+   > `wr_we` 清 0，右下角那一格就永远写不进去 —— 默认用例里它是空地，看不出来，
+   > 所以 `tb_stage` 的 S04e/S05h 专门先把它改成“河”，装载后要求它变回空地。
+2. **装载地图时必须真的没人查地图。**
+   `paused` 期间 `top` 把 `terrain_probe` 和 `bullet_ctrl` 全部复位：probe 的窗口
+   一旦开着就会被 loader 的写口打断；炮弹的命中引擎也可能读到半个新地图
+   （读到 tile 5 就误判“基地被打爆”）。loader 自己也会先看一眼总线是否空闲再动手。
+3. **地图 RAM 的写口要仲裁。**
+   `map_bus` 原来只有“炮弹打砖”一个写者，现在多了 loader。装载期间整条总线是停的，
+   所以 `top` 里就是一个二选一：`ldr_we ? 地图装载 : map_bus`。
+
+### 参数
+
+| 参数 | 板上值 | 含义 |
+| --- | --- | --- |
+| `N_LEVELS` | 4 | 一共几关（`levels.coe` 里几关就填几） |
+| `ENEMIES_PER_STAGE` | 20 | 每关要打多少辆 |
+| `SPAWN_CYCLES` | 300_000_000 | 补车间隔 3s @100MHz |
+| `CLEAR_CYCLES` | 200_000_000 | STAGE CLEAR 横幅停留 2s |
+| `LEVEL_SLOT` | 1024 | 关卡 ROM 里每关占多少项（900 块取整到 1024） |
+
+仿真里 `ENEMIES_PER_STAGE` / `SPAWN_CYCLES` / `CLEAR_CYCLES` 都调小（4 辆 / 400 拍 /
+60 拍），一套用例几十万拍就能把“开局 -> 补车 -> 全灭 -> 换关 -> 循环”跑完一遍。
+
+### HUD 的两处变化
+
+* `LEVEL n` 不再写死 `3'd1`，接的是 `stage_ctrl.level`；
+* `ENEMY` 后面多两位十进制：`ENEMY nn` 是本关剩余敌人（含场上活着的），
+  用“比较链 + 乘 10”算十位/个位，同样没有除法器；
+* 结算横幅的 `VICTORY` 换成 `STAGE CLEAR`（11 个字符 = 176px，正好占满 200px 侧栏）。
+
+### 验证
+
+```text
+tb_terrain 24/24   tb_bullet 88/88   tb_enemy 38/38   tb_combat 28/28
+tb_hud 38/38       tb_fx 30/30       tb_stage 43/43
+（x 4 种 BRAM 读延迟 0/1/2/3 拍 = 28 次全绿，共 289 条断言/轮）
+
+python pysrc\check_mif.py
+blk_mem_level            coe=4096  mif=4096  mismatch=0
+levels entries = 4096 (expect 4096 = 4 levels x 1024)
+L1 blk(14,28)  = 5 (expect 5 base block)
+L2 blk(14,28)  = 5 (expect 5 base block)
+RESULT: ALL MATCH
+
+完整构建（synth + impl + bit，0 errors / 0 critical warnings）：
+  WNS = +0.546 ns   WHS = +0.050 ns   0 failing endpoints
+  Slice LUTs 4073 (19.58%)   Slice Registers 1792 (4.31%)
+  Block RAM 11 (22.00%)      DSP 34 (37.78%)
+```
+
+资源对比（上一轮 -> 这一轮）：LUT 3768 -> 4073（+305），FF 1594 -> 1792（+198），
+**BRAM 10.5 -> 11**（+0.5 = 关卡 ROM 4096x4），DSP 34 -> 34。
+LUT 增量主要花在：`stage_ctrl` 的队列/计时/比较（约 120）、`level_loader` 的
+地址换算与状态机（约 90）、HUD 的两位十进制（约 20）、`enemy_ctrl` 的兵种寄存器
+（4 个寄存器位宽都不大，约 40）、`top` 的写口 mux 与新增连线（约 40）。
+时序从 +1.135 掉到 +0.546 但离 10ns 还很远（0 failing endpoints）：新加的路径是
+“32 位计时器比较 -> 少量组合 -> 寄存器”，没有插进那条
+`sys_clk -> vga_clk` 的 ROM 地址链；而且这几次重跑之间 WNS 在 +0.55 ~ +0.95 之间
+来回跳，说明余量主要是被布局布线（每次 seed 不同）吃掉的，不是新增逻辑吃掉的。
+
+> `blk_mem_level` 需要重新做 OOC 综合时，synth 会多一条 warning：它按默认 20ns 周期
+> 估算（这块 ROM 的 `clka` 实际接 10ns 的 `clock`；其它 ROM 都挂在 20ns 的 `vga_clk` 上，
+> 所以以前不会有这条）。IP 的 OOC 结果一旦缓存命中就不会再出现，这次全量构建的
+> synth 就是 0 error / 0 critical warning / 0 warning。它只是一个 BRAM 原语的综合估算，
+> 布线/时序以顶层约束为准。
+> impl 阶段另有 85 条提示（34 `DPIP-1` + 16 `DPOP-1` + 34 `DPOP-2`，都是 DSP48
+> 流水寄存器的建议，前几轮就有；以及 1 条 `CFGBVS-1` bank 电压配置），都不是 critical。
 
