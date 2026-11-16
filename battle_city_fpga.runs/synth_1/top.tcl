@@ -117,6 +117,8 @@ add_files -quiet E:/college_studies/semester202609/battle_city_fpga/battle_city_
 set_property used_in_implementation false [get_files E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.runs/blk_mem_tank_power_synth_1/blk_mem_tank_power.dcp]
 add_files -quiet E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.runs/blk_mem_tank_fast_synth_1/blk_mem_tank_fast.dcp
 set_property used_in_implementation false [get_files E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.runs/blk_mem_tank_fast_synth_1/blk_mem_tank_fast.dcp]
+add_files -quiet E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.runs/blk_mem_level_synth_1/blk_mem_level.dcp
+set_property used_in_implementation false [get_files E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.runs/blk_mem_level_synth_1/blk_mem_level.dcp]
 read_verilog -library xil_defaultlib {
   E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.srcs/sources_1/new/bullet-ctrl.v
   E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.srcs/sources_1/new/enemy_ctrl.v
@@ -149,9 +151,6 @@ set_property used_in_implementation false [get_files -all e:/college_studies/sem
 
 read_ip -quiet E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.srcs/sources_1/ip/blk_mem_brick/blk_mem_brick.xci
 set_property used_in_implementation false [get_files -all e:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.gen/sources_1/ip/blk_mem_brick/blk_mem_brick_ooc.xdc]
-
-read_ip -quiet E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.srcs/sources_1/ip/blk_mem_level_2/blk_mem_level.xci
-set_property used_in_implementation false [get_files -all e:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.gen/sources_1/ip/blk_mem_level_2/blk_mem_level_ooc.xdc]
 
 OPTRACE "Adding files" END { }
 # Mark all dcp files as not used in implementation to prevent them from being

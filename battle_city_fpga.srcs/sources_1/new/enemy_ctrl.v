@@ -17,19 +17,21 @@
 //  速度：MOVE_DIV 决定节拍（top 里给玩家的 2 倍 -> 12.5Hz，比玩家慢一半）。
 //  几辆车的计数器初值错开（PHASE），不会同手同脚一起走。
 //
-//  AI（朝基地进攻 + 不会被墙角困住）：
-//    1. 前面能走（空地 / 树林）就沿当前朝向走一格；
-//    2. 每 TURN_TICKS 个移动节拍重新选向：3/4 概率直接对准玩家基地
-//       （曼哈顿贪心：先走离基地更远的那一轴），1/4 随机拐一下 ——
-//       这样三辆车不会排成一条直线，但整体一定在往基地压；
-//    3. 前面是墙（砖 / 钢 / 河 / 基地 / 地图外框）时按固定顺序试四个方向：
-//       ① 沿“锁存的横向偏好”贴墙滑（撞墙才换边）② 反方向滑（同时换边）
-//       ③ 掉头 ④ 主轴朝基地，走通一个就把计数器清零。四个方向全覆盖，
-//       所以三面是墙的路口最多三拍就能掉头绕出去；沿着河岸滑的时候
-//       每 6 格再朝基地瞄一次，于是会自己找到浅滩。
-//       横向方向必须“锁存”：如果每拍都拿 x 和基地 x 比大小，车正好在基地
-//       正上方时会左右各滑 5px 反复抖，永远到不了浅滩（实测轨迹就是这样）。
-//       早期版本是纯随机 90° 转向，表现是“聚在墙角原地抖、永远不去打基地”。
+//  AI（直冲基地 + 循环转动绕障，不会被墙角困住）：
+//    1. 前面能走（空地 / 树林）就沿当前朝向走一格；每 TURN_TICKS 个移动
+//       节拍重新选向，永远直接对准玩家基地（曼哈顿贪心：先走离基地更远的
+//       那一轴）——三辆车从三路出发，沿各自的贪心阶梯一路压向基地；
+//    2. 前面是墙（砖 / 钢 / 河 / 基地 / 地图外框 / 别的坦克）时循环转动：
+//       每个节拍沿“朝基地 -> 顺时针90° -> 逆时针90° -> 180°”试一个方向，
+//       走通就沿它走，旋转相位只在“朝基地方向走通”时清零 —— rot 单向推进、
+//       左右横侧交替被尝试，撤退只发生在两侧都被堵住的死胡同；
+//    3. 横移滑行时每隔几格“朝基地瞄一眼”：瞄得通就渡河/转正，瞄不通
+//       立刻退回滑行方向继续扫岸（slide_save 记忆滑行方向）。河是打不开的
+//       墙（炮弹按原版规则飞过河），所以沿河岸扫到浅滩当拍就能渡河 ——
+//       旧版“贴墙滑 + 换边”右左对消、上下弹跳，卡在河岸对河开炮开路。
+//    轴向优先级必须“锁存”（hf_q）：如果每拍都拿 x 和基地 x 比大小，
+//    车正好在基地正上方时会左右各滑 5px 反复抖，永远到不了浅滩。
+//    早期版本是纯随机 90° 转向，表现是“聚在墙角原地抖、永远不去打基地”。
 //
 //  为什么用 generate 展开、而不像炮弹那样做串行引擎：
 //    每辆车只有一套 20 位左右的状态（x/y/dir/计数器/LFSR），逻辑量很小，
@@ -95,9 +97,10 @@ module enemy_ctrl #(
                      D_DOWN  = 2'b01,
                      D_LEFT  = 2'b10,
                      D_RIGHT = 2'b11;
-    // 撞墙后先沿另一轴滑这么多格，再重新朝基地瞄一次。
-    // 这个值决定"沿墙走多远才回头试一次主轴"：太大就会滑过浅滩（浅滩只有
-    // 3 块 = 60px 宽，而坦克每滑一格是 5px），太小又会太频繁地停顿。
+    // 脱困（撞墙 -> 循环转动走通）后，再滑这么多格就重新朝基地瞄一次。
+    // 这个值决定"绕开障碍后走多远才回头试一次主轴"：太大就会滑过浅滩一类的
+    // 窄通道（浅滩只有 3 块 = 60px 宽，而坦克每滑一格是 5px），
+    // 太小又会太频繁地停顿。
     localparam [7:0] SLIDE_TICKS = 8'd3;
 
     // 兵种编号（和 vga.v 的 tank ROM 选择一致）：
@@ -185,11 +188,10 @@ module enemy_ctrl #(
             reg [1:0]  dir;
             reg        alive;
             reg [23:0] cnt;
-            reg [15:0] rnd;
             reg [7:0]  turn_cnt;
             reg [3:0]  fire_cnt;      // 开火周期计数（按自己的移动节拍）
-            reg [2:0]  stuck;         // 撞墙后试到第几个方向（0..3），走通即清零
-            reg        slide_q;       // 锁存的横向滑行方向（1 = 右），撞墙才换边
+            reg [1:0]  rot;           // 撞墙后的旋转相位（0..3）：朝基地→顺时针90°→逆时针90°→180°
+            reg [1:0]  slide_save;    // 滑行中"瞄一眼基地"时记住的滑行方向（瞄不过去就退回它）
             reg [1:0]  hp;            // 当前血量：装甲 2，其它 1
             reg [1:0]  my_type;       // 本槽当前兵种（出场时写入）
             reg [23:0] step;          // 本槽当前的移动节拍分频
@@ -200,12 +202,11 @@ module enemy_ctrl #(
 
             // ---------------- 朝基地的“贪心”目标方向 ----------------
             // 以基地中心 (300,560) 为目标做曼哈顿贪心：先走离基地更远的那一轴。
-            //   want_dir   = 朝基地的方向（定期选向、以及试错④用）
-            //   slide_dir  = 撞墙后贴墙滑的方向（另一轴）
-            //   slide_flip = slide_dir 的反向（贴墙滑也撞墙时用，同时换边）
-            // 注意横向这一轴用的是【锁存】的 slide_q（撞墙才换边），不是"实时比
-            // 较 x 和基地 x"：车正好在基地正上方时（|dx| ≤ 5），实时比较每拍都
-            // 会翻转，结果是在河岸 ±5px 原地抖、永远滑不到浅滩（第一版就是这样）。
+            //   want_dir = 朝基地的方向（定期选向、以及撞墙旋转的第 0 相位用）
+            //   （旧版的 slide_dir/slide_flip 贴墙滑已被 rot_cw 循环转动取代）
+            // 轴向优先级要【锁存】（hf_q）：选定一轴就一直开到对齐（≤ 2 格）再换轴，
+            // 车正好在基地正上方时才不会左右各滑 5px 反复抖、永远到不了浅滩。
+            // （旧版这里用的是 slide_q 贴墙滑，撞墙才换边；已被 rot_cw 循环转动取代。）
             wire        tgt_right   = (x < TGT_X);          // 基地在车右边
             wire        tgt_down    = (y < TGT_Y);          // 基地在车下面
             wire [9:0]  dist_x      = tgt_right ? (TGT_X - x) : (x - TGT_X);
@@ -224,10 +225,13 @@ module enemy_ctrl #(
             wire [1:0]  want_h      = tgt_right ? D_RIGHT : D_LEFT;
             wire [1:0]  want_v      = tgt_down  ? D_DOWN : D_UP;
             wire [1:0]  want_dir    = horiz_first ? want_h : want_v;
-            wire [1:0]  slide_h     = slide_q ? D_RIGHT : D_LEFT;
-            wire [1:0]  slide_dir   = horiz_first ? want_v  : slide_h;
-            wire [1:0]  slide_flip  = horiz_first ? (want_v ^ 2'b01)
-                                                  : (slide_q ? D_LEFT : D_RIGHT);
+
+            // 顺时针转 90°（屏幕上 上→右→下→左 是顺时针）。
+            // 撞墙后按 朝基地 -> 顺时针90° -> 180° -> 270° 的顺序每拍试一个方向，
+            // rot 单向推进不回头，绕障碍物是真正的“循环转动”：
+            // 旧版“贴墙滑 + 换边”的 ①② 两步共用同一个 slide_q 且在 ② 翻转它，
+            // 于是序列变成 右→左→左→右→…永远对消，卡在墙角原地 ±5px 抖。
+            // （函数本体在模块级声明，见文件末尾 generate 之外的 rot_cw。）
 
             // 已经贴到基地跟前（横竖都在 3 块 = 60px 以内）：不再四方向试探，
             // 直接面向基地、用炮弹把挡路的砖打穿。老版本在这个距离上仍然
@@ -279,22 +283,18 @@ module enemy_ctrl #(
             // ---------------- 决策流水（时序修复）----------------
             // “下一拍(tick_q)怎么走”在 tick 拍全部算好并寄存起来。
             // 原来 x/y/dir -> cand±5 -> tank_block 4 路比较 -> can_go ->
-            // want_dir/slide/stuck 多路选择 -> dir 下一态是一条 15~16 级的
+            // want_dir/旋转多路选择 -> dir 下一态是一条 15~16 级的
             // 组合长链（时序报告的 WNS -0.459 / TNS -17.8 主要来自这里）。
             // 敌人移动节拍只有 12.5~25Hz，决策早 10ns 做出完全无感；
             // 两拍之间 x/y/dir/turn_cnt 都不会变，寄存的决策与“当拍现算”
-            // 严格等价（LFSR 的随机位在这里做快照，语义不变）。
+            // 严格等价。
             reg        d_terrain_ok;  // 决策时 probe 的结果是否可信
             reg        d_can_go;      // 前面能走（空地/树林且没有别的车）
             reg        d_wall_ahead;  // 前面是砖/钢/河/基地
             reg        d_attack;      // 已贴到基地跟前
             reg        d_turn_over;   // 巡逻计时到点，要重新选向
             reg        d_hf_next;     // 轴向锁存的下一步
-            reg        d_rnd_turn;    // LFSR rnd[6]&rnd[7]：随机拐 90° 的开关
-            reg        d_rnd_left;    // LFSR rnd[0]：随机拐左还是右
             reg [1:0]  d_want_dir;    // 朝基地的贪心方向
-            reg [1:0]  d_slide_dir;   // 撞墙后贴墙滑的方向
-            reg [1:0]  d_slide_flip;  // 贴墙滑的反向（同时换边）
 
             always @(posedge clock) begin
                 if (reset || spawn[gi]) begin
@@ -304,11 +304,7 @@ module enemy_ctrl #(
                     d_attack     <= 1'b0;
                     d_turn_over  <= 1'b0;
                     d_hf_next    <= 1'b0;
-                    d_rnd_turn   <= 1'b0;
-                    d_rnd_left   <= 1'b0;
                     d_want_dir   <= 2'b00;
-                    d_slide_dir  <= 2'b00;
-                    d_slide_flip <= 2'b00;
                 end else if (tick) begin
                     d_terrain_ok <= terrain_valid[gi];
                     d_can_go     <= can_go;
@@ -316,11 +312,7 @@ module enemy_ctrl #(
                     d_attack     <= attack;
                     d_turn_over  <= (turn_cnt >= TURN_TICKS - 1);
                     d_hf_next    <= hf_next;
-                    d_rnd_turn   <= (rnd[6] & rnd[7]);
-                    d_rnd_left   <= rnd[0];
                     d_want_dir   <= want_dir;
-                    d_slide_dir  <= slide_dir;
-                    d_slide_flip <= slide_flip;
                 end
             end
 
@@ -345,11 +337,10 @@ module enemy_ctrl #(
                 dir         = SPAWN_D;
                 alive       = 1'b0;
                 cnt         = PHASE;
-                rnd         = 16'h1ACE + gi[15:0];
                 turn_cnt    = 8'd0;
                 fire_cnt    = 4'd0;
-                stuck       = 3'd0;
-                slide_q     = 1'b1;
+                rot         = 2'd0;
+                slide_save  = SPAWN_D;
                 hf_q        = 1'b0;      // 先走纵向（出生点在屏幕顶端，基地在下面）
                 hp          = 2'd1;
                 my_type     = DEF_TYPE;
@@ -366,11 +357,10 @@ module enemy_ctrl #(
                     dir         <= SPAWN_D;
                     alive       <= 1'b0;
                     cnt         <= PHASE;
-                    rnd         <= 16'h1ACE + gi[15:0];
                     turn_cnt    <= 8'd0;
                     fire_cnt    <= 4'd0;
-                    stuck       <= 3'd0;
-                    slide_q     <= 1'b1;
+                    rot         <= 2'd0;
+                    slide_save  <= SPAWN_D;
                     hf_q        <= 1'b0;
                     hp          <= 2'd1;
                     my_type     <= DEF_TYPE;
@@ -381,8 +371,8 @@ module enemy_ctrl #(
                     kill_req    <= 1'b0;
                 end else if (spawn[gi]) begin
                     // ---------------- 出场：回出生点 + 按兵种装一套参数 ----------------
-                    // 复用同一个槽（上一辆已经死了），所以这里要把计数器和
-                    // 随机数种子全部重来，否则新车会继承旧车的转向节奏。
+                    // 复用同一个槽（上一辆已经死了），所以这里要把计数器全部重来，
+                    // 否则新车会继承旧车的转向节奏。
                     x           <= SPAWN_X;
                     y           <= SPAWN_Y;
                     dir         <= SPAWN_D;
@@ -390,8 +380,8 @@ module enemy_ctrl #(
                     cnt         <= PHASE;
                     turn_cnt    <= 8'd0;
                     fire_cnt    <= 4'd0;
-                    stuck       <= 3'd0;
-                    slide_q     <= (SPAWN_X < TGT_X);   // 先朝基地那一侧滑
+                    rot         <= 2'd0;
+                    slide_save  <= SPAWN_D;
                     hf_q        <= 1'b0;                // 新车重新从“先纵向”开始
                     my_type     <= ntype;
                     step        <= n_step;
@@ -403,10 +393,6 @@ module enemy_ctrl #(
                 end else begin
                     fire_req <= 1'b0;      // 两个都是单拍脉冲
                     kill_req <= 1'b0;
-
-                    // 16 位 LFSR（x^16 + x^14 + x^13 + x^11 + 1，最大长度序列）。
-                    // 每拍走一步，换向时取里面不同的低位：不可预测但完全可复现。
-                    rnd <= {rnd[14:0], rnd[15] ^ rnd[13] ^ rnd[12] ^ rnd[10]};
 
                     // ---------------- 挨打：先扣血，血光才死 ----------------
                     // 装甲坦克要两发（第一发只掉血，车身不变），其它一发就碎。
@@ -436,9 +422,7 @@ module enemy_ctrl #(
                             fire_cnt <= fire_cnt + 4'd1;
                         end
 
-                        // 巡逻计时：到点后重新选向。
-                        // 3/4 概率直接对准基地（want_dir），1/4 随机拐 90°：
-                        // 既保证整体在进攻，又不会三辆车排成一条直线。
+                        // 巡逻计时：到点后重新选向（永远朝基地 —— “直冲基地”）。
                         if (d_turn_over) turn_cnt <= 8'd0;
                         else             turn_cnt <= turn_cnt + 8'd1;
 
@@ -456,45 +440,62 @@ module enemy_ctrl #(
                                 2'b10:   if (x != 10'd0)          x <= x - TILE;  // 左
                                 default: if ((x + TILE) <= X_MAX) x <= x + TILE; // 右
                             endcase
-                            stuck <= 3'd0;
+                            // 只有“朝基地方向走通”才把旋转相位清零：横移脱困时
+                            // 保持相位，下次撞墙就试另一个横侧（左右交替扫河岸），
+                            // 不会每次都从同一侧重新开始。
+                            if (dir == d_want_dir) begin
+                                rot        <= 2'd0;
+                                slide_save <= d_want_dir;   // 失效
+                            end
                             // 轴向锁存跟着“离基地的远近”推进（见 hf_next 的说明）
                             hf_q <= d_hf_next;
-                            // 到点重新选向：这一格照走，下一拍 probe 会按新朝向重扫
-                            if (d_turn_over)
-                                dir <= d_rnd_turn
-                                     ? (dir ^ (d_rnd_left ? 2'b10 : 2'b11))   // 随机拐 90°
-                                     : d_want_dir;                            // 朝基地
+                            // 到点重瞄基地：滑行中先把滑行方向记进 slide_save，
+                            // 朝基地瞄一眼——瞄得通就渡河/转正，瞄不通下一拍
+                            // 立刻退回滑行方向继续扫岸（见下面阻塞分支）。
+                            if (d_turn_over) begin
+                                if (dir != d_want_dir) slide_save <= dir;
+                                dir <= d_want_dir;   // 直冲基地
+                            end
                         end else if (d_attack && d_wall_ahead) begin
                             // 贴到基地跟前、前面是砖：别再转圈，直接顶着墙打。
                             // （这一支就是“敌人到家门口反复转圈进不去”的修复：
                             //   与其在 4 个方向里轮着试，不如朝着基地一直开炮，
                             //   炮弹会把砖墙一块一块啃掉，几发之后就能开进去。）
-                            dir      <= d_want_dir;
-                            stuck    <= 3'd0;
-                            turn_cnt <= 8'd0;
+                            dir        <= d_want_dir;
+                            rot        <= 2'd0;
+                            slide_save <= d_want_dir;   // 失效
+                            turn_cnt   <= 8'd0;
                             // 顶墙时补一炮。bullet_ctrl 有 0.2s 冷却 + 同屏 1 发，
                             // 这里多发几次请求也不会变成弹幕。
                             fire_req <= 1'b1;
                             fire_cnt <= 4'd0;
                             hf_q     <= d_hf_next;
+                        end else if (dir == d_want_dir && slide_save != d_want_dir) begin
+                            // 刚才那一拍只是“朝基地瞄一眼”：这边过不去（河/墙/车），
+                            // 立刻退回滑行方向继续扫岸，绝不在这里旋转或撤退。
+                            // 这是“敌人卡在河上、对河开炮开路”的根治：
+                            //   滑行中每 3 格瞄一次，浅滩当拍就能被发现并渡河；
+                            //   河是打不开的墙（炮弹本来就该飞过河），AI 必须绕。
+                            dir        <= slide_save;
+                            slide_save <= d_want_dir;   // 失效
+                            rot        <= 2'd0;
+                            turn_cnt   <= TURN_TICKS - SLIDE_TICKS;
+                            hf_q       <= d_hf_next;
                         end else begin
                             // 前面是墙（砖 / 钢 / 河 / 基地 / 地图外框）或者别的坦克。
-                            // 按固定顺序依次试四个方向，走通一个就把 stuck 清零：
-                            //   ① 沿锁存的横向方向贴墙滑   ② 反方向滑（并换边）
-                            //   ③ 掉头（主轴反向）         ④ 主轴朝基地
-                            // 四个方向全覆盖，所以"三面是墙"的路口最多三拍就能
-                            // 掉头出去；旧版随机转 90° 会在这种路口左右来回抖，
-                            // 永远想不到往上走 —— stuck 就是这个计数器。
-                            case (stuck)
-                                3'd0:    dir <= d_slide_dir;
-                                3'd1:    dir <= d_slide_flip;
-                                3'd2:    dir <= d_want_dir ^ 2'b01;
-                                default: dir <= d_want_dir;
+                            // 循环转动：每个节拍换一个方向，顺序是
+                            //   朝基地 -> 顺时针90° -> 逆时针90° -> 180° ->（循环）
+                            // rot 单向推进；横移脱困不清零（只有朝基地走通才清零），
+                            // 所以左右两个横侧会交替被尝试，撤退(180°)只在
+                            // 两侧都被堵住时用 —— 旧版在这里右左对消、上下弹跳。
+                            case (rot)
+                                2'd0:    dir <= d_want_dir;
+                                2'd1:    dir <= rot_cw(d_want_dir);
+                                2'd2:    dir <= rot_cw(d_want_dir) ^ 2'b01;
+                                default: dir <= d_want_dir ^ 2'b01;
                             endcase
-                            if (stuck == 3'd1) slide_q <= ~slide_q;   // ② 之后换边
-                            if (stuck == 3'd3) stuck   <= 3'd0;
-                            else               stuck   <= stuck + 3'd1;
-                            // 滑 SLIDE_TICKS 格之后再重新朝基地瞄一次
+                            rot <= rot + 2'd1;
+                            // 脱困后每滑 SLIDE_TICKS 格就朝基地瞄一次
                             turn_cnt <= TURN_TICKS - SLIDE_TICKS;
                             hf_q     <= d_hf_next;
                         end
@@ -503,5 +504,21 @@ module enemy_ctrl #(
             end
         end
     endgenerate
+
+    // 顺时针转 90°：上(00)->右(11)->下(01)->左(10)->上。
+    // 撞墙后循环转动（朝基地 -> 顺时针90° -> 逆时针90° -> 180°）用它算
+    // 相位 1/2 的方向（相位 2 = rot_cw^01 = 逆时针，相位 3 = 取反 = 180°）。
+    // Verilog 不允许在 generate 循环里声明函数，所以放在模块级这里。
+    function [1:0] rot_cw;
+        input [1:0] d;
+        begin
+            case (d)
+                2'b00:   rot_cw = 2'b11;  // 上 -> 右
+                2'b01:   rot_cw = 2'b10;  // 下 -> 左
+                2'b10:   rot_cw = 2'b00;  // 左 -> 上
+                default: rot_cw = 2'b01;  // 右 -> 下
+            endcase
+        end
+    endfunction
 
 endmodule

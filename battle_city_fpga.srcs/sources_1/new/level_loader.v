@@ -83,10 +83,13 @@ module level_loader #(
     wire [6:0]  gx = {2'b0, bx, 2'b00} + {5'd0, cc[1:0]};
     wire [6:0]  gy = {2'b0, by, 2'b00} + {5'd0, cc[3:2]};
     // 基地块：落在基地矩形（4x4 格 = 鹰的 20x20 包围盒）里的格子是 5，
-    // 该块其余格子补砖 —— 于是砖墙紧贴着鹰，基地被砖围住，没有黑缝。
+    // 矩形上/左/右的格子补砖（U 型堡垒的墙），矩形下方敞开留空 ——
+    // 经典样式：鹰完整可见，不埋在整块砖里。和 pysrc 的 expand 规则逐格一致。
     wire        in_hq = (gx >= HQ_X0) && (gx < HQ_X0 + HQ_W) &&
                         (gy >= HQ_Y0) && (gy < HQ_Y0 + HQ_H);
-    wire [3:0]  tile  = (blk == 4'd5) ? (in_hq ? 4'd5 : 4'd1) : blk;
+    wire [3:0]  tile  = (blk == 4'd5) ? (in_hq ? 4'd5
+                                             : ((gy < HQ_Y0 + HQ_H) ? 4'd1 : 4'd0))
+                                      : blk;
     // 地图地址 = gy * MAP_W + gx；MAP_W = 120 = 128 - 8
     wire [14:0] cell_addr = ({8'd0, gy} << 7) - ({8'd0, gy} << 3) + {8'd0, gx};
 

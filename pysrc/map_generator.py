@@ -101,7 +101,9 @@ def check_level(rows):
         sys.exit('关卡文件有问题：\n  ' + '\n  '.join(errs))
 
 def expand(rows):
-    """块 -> 格。'H' 块里落在基地矩形内的格子是 5，其余补砖（基地的台座）"""
+    """块 -> 格。'H' 块里落在基地矩形内的格子是 5；矩形上/左/右的格子补砖
+       （U 型堡垒的墙），矩形【下方】的格子留空 —— 经典 Battle City 的基地
+       正面敞开：鹰完整可见，不埋在整块砖里。"""
     cells = [[0] * MAP_COLS for _ in range(MAP_ROWS)]
     for by in range(BROWS):
         for bx in range(BCOLS):
@@ -113,7 +115,11 @@ def expand(rows):
                     if ch == 'H':
                         in_hq = (HQ_X0 <= gx < HQ_X0 + HQ_W and
                                  HQ_Y0 <= gy < HQ_Y0 + HQ_H)
-                        cells[gy][gx] = 5 if in_hq else 1
+                        if in_hq:
+                            cells[gy][gx] = 5
+                        elif gy < HQ_Y0 + HQ_H:   # 上/左/右：砖墙
+                            cells[gy][gx] = 1
+                        # gy >= HQ_Y0 + HQ_H：正面敞开，留空
                     else:
                         cells[gy][gx] = TILE_CHAR[ch]
     return cells
@@ -201,14 +207,15 @@ def validate(cells):
     if stray:
         errs.append(f'基地矩形之外还有 {len(stray)} 格 tile 5，例如 {stray[0]}')
 
-    # --- 1b. 砖块必须把基地围起来 ---
-    # 基地本体只有 4x4 格（= 鹰的 20x20 包围盒），上下左右各 1 格必须是砖/钢：
+    # --- 1b. 砖块必须把基地围起来（经典 U 型堡垒：左/上/右三面） ---
+    # 基地本体只有 4x4 格（= 鹰的 20x20 包围盒），左/上/右各 1 格必须是砖/钢：
     # 这样敌人只能先打掉砖墙才摸得到基地，玩家也才有"守家"这件事可做。
-    # 只有地图外沿（基地贴底边那一行）不要求。
+    # 下方【不要求】—— 正面敞开，鹰完整可见（旧版把鹰整个埋进实心砖块，
+    # 正面看不到基地）；而且基地贴着地图底边，坦克永远站不到基地下面，
+    # 敞开不会带来新的进攻路线。
     shell = ([(HQ_X0 - 1, y) for y in range(HQ_Y0, HQ_Y0 + HQ_H)] +
              [(HQ_X0 + HQ_W, y) for y in range(HQ_Y0, HQ_Y0 + HQ_H)] +
-             [(x, HQ_Y0 - 1) for x in range(HQ_X0, HQ_X0 + HQ_W)] +
-             [(x, HQ_Y0 + HQ_H) for x in range(HQ_X0, HQ_X0 + HQ_W)])
+             [(x, HQ_Y0 - 1) for x in range(HQ_X0, HQ_X0 + HQ_W)])
     leak = [(x, y) for (x, y) in shell
             if 0 <= x < MAP_COLS and 0 <= y < MAP_ROWS
             and cells[y][x] not in (TILE_CHAR['#'], TILE_CHAR['S'])]
@@ -259,7 +266,7 @@ def validate(cells):
         if (ex, ey) not in reach:
             errs.append(f'敌人出生点 ({ex},{ey}) 的 20x20 车身开不到（通道太窄）')
     # 基地三面的"贴脸位置"：左 / 右 / 正上方各一处（就是敌人能打到基地的位置）。
-    # 堡垒占块 13~16 x 26~29（x 260~339 / y 520~599），所以三个贴脸位置正好是
+    # 堡垒占块 14~15 x 28~29（x 280~319 / y 560~599），所以三个贴脸位置正好是
     # 块 (12,28) / (17,28) / (15,25)，起点都是整块的倍数。
     for name, (tx, ty) in (('基地左侧', (240, 560)),
                            ('基地右侧', (340, 560)),

@@ -72,6 +72,7 @@ try {
 
     # ---------- 2. 每种 BRAM 读延迟各跑一遍 ----------
     $src = Resolve-Path (Join-Path $PSScriptRoot '..\battle_city_fpga.srcs\sources_1\new')
+    $simsrc = Resolve-Path (Join-Path $PSScriptRoot '..\battle_city_fpga.srcs\sim_1\new')
     $design = @(
         (Join-Path $src 'top.v'),
         (Join-Path $src 'player.v'),
@@ -111,8 +112,8 @@ try {
         $defArgs = @()
         if ($lat -ne 1) { $defArgs += @('-d', "BRAM_LATENCY_$lat") }
 
-        $tbFiles = $tbs | ForEach-Object { $_.File }
-        & $xvlog @defArgs @design 'bram_stubs.v' @tbFiles
+        $tbFiles = $tbs | ForEach-Object { Join-Path $simsrc $_.File }
+        & $xvlog @defArgs @design (Join-Path $simsrc 'bram_stubs.v') @tbFiles
         if ($LASTEXITCODE -ne 0) { throw "xvlog failed (latency $lat)" }
 
         foreach ($tb in $tbs) {

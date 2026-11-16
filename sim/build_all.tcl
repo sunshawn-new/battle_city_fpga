@@ -63,6 +63,17 @@ update_compile_order -fileset sources_1
 # 内容来自 pysrc/gen_levels.py 生成的 levels.coe。
 if {[llength [get_ips -quiet blk_mem_level]] == 0} {
     puts "=== create IP: blk_mem_level ==="
+    # 防御：磁盘上可能残留同名/副本目录（历史上出现过 blk_mem_level_1/_2，
+    # .xpr 引用的 .xci 在 _2 目录、生成目录却指向 blk_mem_level —— 路径错乱会让
+    # generate_target 静默失败，.mif 不刷新，比特流里是旧关卡）。不删掉的话
+    # create_ip 会再生成一个副本，重蹈覆辙。
+    foreach d [glob -nocomplain \
+        "$root/battle_city_fpga.srcs/sources_1/ip/blk_mem_level*" \
+        "$root/battle_city_fpga.gen/sources_1/ip/blk_mem_level*" \
+        "$root/battle_city_fpga.runs/blk_mem_level*"] {
+        puts "=== delete stale dir: $d ==="
+        file delete -force $d
+    }
     create_ip -name blk_mem_gen -vendor xilinx.com -library ip -version 8.4 -module_name blk_mem_level
     set_property -dict [list \
         CONFIG.Memory_Type {Single_Port_ROM} \
@@ -79,6 +90,7 @@ if {[llength [get_ips -quiet blk_mem_level]] == 0} {
         CONFIG.Enable_A {Always_Enabled} \
         CONFIG.Enable_B {Always_Enabled} \
     ] [get_ips blk_mem_level]
+    set_property GENERATE_SYNTH_CHECKPOINT 1 [get_files blk_mem_level.xci]
 } else {
     puts "=== IP exists: blk_mem_level ==="
 }
@@ -88,13 +100,24 @@ update_compile_order -fileset sources_1
 # 只改根目录的 *_16bit.coe 而不重新 generate_target，综合会用 IP 目录里的旧数据
 # （上一版就因为这样，改完颜色上板还是老样子）。
 foreach ip [get_ips -quiet] {
-    if {[catch {
-        reset_target all $ip
-        generate_target all $ip
-    } err]} {
-        puts "WARNING: regenerate $ip failed: $err"
-    } else {
-        puts "=== regenerated IP: $ip ==="
+    set gen_ok 0
+    for {set attempt 1} {$attempt <= 3} {incr attempt} {
+        if {[catch {
+            reset_target all $ip
+            generate_target all $ip
+        } err]} {
+            puts "WARNING: regenerate $ip failed (attempt $attempt/3): $err"
+            after 3000
+        } else {
+            puts "=== regenerated IP: $ip ==="
+            set gen_ok 1
+            break
+        }
+    }
+    if {!$gen_ok} {
+        # generate 失败绝不能继续：reset_target 已经把产物删掉，
+        # 继续跑综合只会得到“module not found”或者更糟的旧数据。
+        error "regenerate $ip failed after 3 attempts"
     }
 }
 
@@ -102,6 +125,34 @@ foreach ip [get_ips -quiet] {
 # 磁盘；必须再 update_compile_order 才会重新进入综合的文件列表，
 # 否则 synth 会报 "module 'blk_mem_xxx' not found"。
 update_compile_order -fileset sources_1
+
+# ---- 铁律：每个 IP 的 .mif/.mem 必须比它的 .coe 新 ----
+# 比特流的 BRAM 初始化数据来自 .mif；只比 .coe 和 OOC .dcp 会被绕过（.dcp 会用
+# 旧 .mif 重综合、时间戳反而变新）。历史上 blk_mem_level 的 .mif 曾停在旧版两天，
+# 表现为“仿真全绿（仿真直接读 .coe）、板上旧地图”。这里不通过就拒绝继续构建。
+puts "=== check mif freshness ==="
+set stale_mif 0
+foreach ip [get_ips -quiet] {
+    set n [get_property NAME $ip]
+    set ipf [get_files -quiet "$root/battle_city_fpga.srcs/sources_1/ip/$n/$n.xci"]
+    if {[llength $ipf] == 0} { continue }
+    # 只有 .xci 才有 CONFIG.Coe_File；文件列表里混入 .dcp 时 get_property 会报错，
+    # 用 catch 跳过（.dcp 的陈旧性由下面 OOC 循环另行把关）。
+    if {[catch { set coe_rel [get_property CONFIG.Coe_File [lindex $ipf 0]] }]} { continue }
+    if {$coe_rel eq ""} { continue }
+    set coe_abs [file normalize "$root/battle_city_fpga.srcs/sources_1/ip/$n/$coe_rel"]
+    if {![file exists $coe_abs]} { continue }
+    set mif "$root/battle_city_fpga.gen/sources_1/ip/$n/$n.mif"
+    if {![file exists $mif] || ([file mtime $coe_abs] > [file mtime $mif])} {
+        puts "ERROR: $n 的 .mif 比 .coe 旧（比特流会带旧数据，检查 generate_target 是否失败）"
+        incr stale_mif
+    } else {
+        puts "=== mif fresh: $n ==="
+    }
+}
+if {$stale_mif > 0} {
+    error "$stale_mif 个 IP 的 .mif 是旧的，拒绝继续构建"
+}
 
 # OOC（GENERATE_SYNTH_CHECKPOINT=1）的 IP 更麻烦：顶层综合用的是它综合出来的 .dcp，
 # 那个 .dcp 的文件条目被 reset_target 删掉之后，综合阶段会直接报 module not found。

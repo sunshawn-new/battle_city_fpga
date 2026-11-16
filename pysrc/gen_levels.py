@@ -54,7 +54,8 @@ def find_levels(explicit=None):
 def expand_cells(blocks):
     """硬件展开规则的 Python 版（和 level_loader.v 逐格对应）：
        块 -> 4x4 格，tile_id 直接抄；'H' 块（5）里落在基地矩形内的格子是 5，
-       其余是 1（砖）—— 基地因此坐在一个砖砌的台座上。"""
+       矩形上/左/右是 1（砖，U 型堡垒的墙），矩形下方留空（0）——
+       经典样式：鹰完整可见，不埋在整块砖里。"""
     hx, hy, hw, hh = HW_HQ
     cells = [[0] * mg.MAP_COLS for _ in range(mg.MAP_ROWS)]
     for by in range(mg.BROWS):
@@ -65,7 +66,11 @@ def expand_cells(blocks):
                     gx, gy = bx * 4 + cx, by * 4 + cy
                     if t == 5:
                         inside = (hx <= gx < hx + hw) and (hy <= gy < hy + hh)
-                        cells[gy][gx] = 5 if inside else 1
+                        if inside:
+                            cells[gy][gx] = 5
+                        elif gy < hy + hh:        # 上/左/右：砖墙
+                            cells[gy][gx] = 1
+                        # gy >= hy + hh：正面敞开，留空
                     else:
                         cells[gy][gx] = t
     return cells
