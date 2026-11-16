@@ -45,17 +45,17 @@ PANEL_X = 600                             # 侧栏起点（hud.v 的 X0）
 W, H = 800, 600                           # 整个画面
 PLAY_W, PLAY_H = MAP_W * TILE, MAP_H * TILE   # 600 x 600 玩区
 HQ_X0, HQ_Y0 = 290, 565                   # 和 vga.v 的 localparam 保持一致
-PLAYER_X, PLAYER_Y = 300, 300             # player.v 复位值 = WIDTH/2 HEIGHT/2
+PLAYER_X, PLAYER_Y = 200, 560             # player.v 的 SPAWN_X/SPAWN_Y（第 1 关出生点）
 BULLET_X, BULLET_Y = 305, 260             # 演示用：坦克正上方一发
 
-# 敌方坦克：和 enemy_ctrl.v 的出生点/初始朝向/兵种一致（都在第 0~1 块，朝下 = dir 1）
+# 敌方坦克：和 enemy_ctrl.v 的出生点/初始朝向/兵种一致（贴着画面顶边 y=0，朝下 = dir 1）
 #   (x, y, dir, 贴图名)：左边快速 / 中间火力 / 右边装甲
-ENEMIES = ((40,  10, 1, 'tank_fast'),
-           (300, 10, 1, 'tank_power'),
-           (560, 10, 1, 'tank_armor'))
+ENEMIES = ((40,  0, 1, 'tank_fast'),
+           (300, 0, 1, 'tank_power'),
+           (560, 0, 1, 'tank_armor'))
 
 # 爆炸演示：中间那辆（火力）刚被击毁 -> 在它的 20x20 位置画第 1 帧（亮爆团）
-BOOM_X, BOOM_Y = 300, 10
+BOOM_X, BOOM_Y = 300, 0
 
 # ---------------- HUD（和 hud.v 的行表一一对应）----------------
 HUD_BG    = 0x113
@@ -289,6 +289,11 @@ def main():
             hud_text(300, 'GAME OVER', HUD_VALUE, 28)
         else:
             hud_text(300, 'STAGE CLEAR', HUD_VALUE, 12)
+
+    # GAME OVER 下面的“按 BTNC 重开”提示：hud.v 里是 y=322、行首 x0+20、闪烁的
+    # 橙色文字（这里画“亮”的那一帧）。这是重开一局在板子上唯一的入口。
+    if game_over:
+        hud_text(322, 'PRESS BTNC', HUD_TITLE, 20)   # 亮帧用橙色（0xFE0），和 hud.v 一致
 
     for y in range(H):
         for x in range(W):

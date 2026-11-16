@@ -35,7 +35,23 @@ def read_mif(path):
 
 
 def find_mif(name):
-    """.gen/ 和 .srcs/ 两处都可能生成 IP 的 .mif，按需找"""
+    """.gen/ 和 .srcs/ 两处都可能生成 IP 的 .mif，按需找。
+
+    注意：Vivado 遇到重名 IP 会另起一个目录（xxx_1）。本工程换关卡 ROM 时
+    就出现过这种情况 —— 磁盘上同时留着旧的 ip/blk_mem_level/ 和工程真正
+    在用的 ip/blk_mem_level_1/，旧目录里那份 .mif 是过期的。
+    所以先读工程文件，看这个 IP 到底挂在哪个目录；找不到再退回按名字猜。
+    """
+    xpr = os.path.join(ROOT, 'battle_city_fpga.xpr')
+    if os.path.exists(xpr):
+        text = io.open(xpr, encoding='utf-8', errors='ignore').read()
+        pat = r'\$PSRCDIR/sources_1/ip/([^/"]+)/' + re.escape(name) + r'\.xci'
+        for m in re.finditer(pat, text):
+            for base in ('battle_city_fpga.gen', 'battle_city_fpga.srcs'):
+                hits = glob.glob(os.path.join(ROOT, base, 'sources_1', 'ip',
+                                              m.group(1), '*.mif'))
+                if hits:
+                    return hits[0]
     for base in ('battle_city_fpga.gen', 'battle_city_fpga.srcs'):
         hits = glob.glob(os.path.join(ROOT, base, 'sources_1', 'ip', name, '*.mif'))
         if hits:
@@ -72,8 +88,13 @@ coe = read_coe(os.path.join(ROOT, 'map.coe'))
 print('coe entries  =', len(coe), '(expect 19200 = 14400 cells + padding)')
 print('cell(20,32)  =', coe[32 * MAP_W + 20], '(expect 0 river ford)')
 print('cell(0,32)   =', coe[32 * MAP_W + 0],  '(expect 3 river)')
-print('cell(60,60)  =', coe[60 * MAP_W + 60], '(expect 0 player spawn)')
-print('cell(56,112) =', coe[112 * MAP_W + 56], '(expect 5 base)')
+print('cell(40,112) =', coe[112 * MAP_W + 40], '(expect 0 player spawn: 200,560)')
+print('cell(8,0)    =', coe[0 * MAP_W + 8],    '(expect 0 enemy spawn: 40,0)')
+print('cell(60,0)   =', coe[0 * MAP_W + 60],   '(expect 0 enemy spawn: 300,0)')
+print('cell(112,0)  =', coe[0 * MAP_W + 112],  '(expect 0 enemy spawn: 560,0)')
+print('cell(8,4)    =', coe[4 * MAP_W + 8],    '(expect 0 below enemy spawn: 出生就能往下开)')
+print('cell(58,113) =', coe[113 * MAP_W + 58], '(expect 5 base: 4x4 = 鹰的包围盒)')
+print('cell(56,112) =', coe[112 * MAP_W + 56], '(expect 1 brick: 基地外围的砖)')
 print('cell(119,119)=', coe[119 * MAP_W + 119], '(expect 0, last valid cell)')
 print('cell padding =', coe[14400], '(expect 0, first padded entry)')
 

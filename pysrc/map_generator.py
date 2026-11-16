@@ -19,11 +19,17 @@
 #  墙厚取 1 块（20px = 4 格）才不会被贴图切断。炮弹打掉 20x10，正好半块。
 #
 #  写完会做一遍约束校验（不通过就报错退出，不会留下半成品 map.coe）：
-#    1. 基地本体必须正好是 列 56~63 x 行 112~117 的 8x6 格，
-#       因为 vga.v 的 HQ_X0/HQ_Y0 = 290/565 是按这个位置写死的；
-#       整张地图不许有第二处 tile_id = 5。
-#    2. 玩家出生点 (300,300) 及上下通路、三个敌人的出生点必须空。
-#    3. 从玩家出生点 BFS：三个敌人出生点 + 基地堡垒左上/右上/上方都要能走到。
+#    1. 基地本体必须正好是 列 58~61 x 行 113~116 的 4x4 格 —— 正好等于
+#       vga.v 里那张 20x20 金鹰精灵的包围盒（HQ_X0/HQ_Y0 = 290/565），
+#       所以鹰身上不会出现"黑缝"；整张地图不许有第二处 tile_id = 5。
+#    2. 基地四周（上下左右各 1 格）必须是砖/钢 —— 砖块必须把基地围起来，
+#       否则坦克能直接贴着基地开火，一炮就没了。
+#    3. 玩家出生点 (200,560) 及上下通路、三个敌人的出生点必须空。
+#       （玩家出生点从"屏幕正中央"挪到了基地左边 —— 原版 Battle City 就是
+#        贴着老家出生的：中路出生会被上方三路敌人直接对射，一开局就爆。）
+#    4. 从玩家出生点出发，用 **20x20 坦克本体** 在 5 像素栅格上做 BFS：
+#       三个敌人出生点 + 基地堡垒左上/右上/上方都要能开到。
+#       （只做"格子连通"不够：1 块宽的夹缝格子是通的，20px 的车身却拐不进去。）
 #
 #  用法：
 #    python pysrc\map_generator.py                     # 默认关卡 1
@@ -48,12 +54,19 @@ TILE_CHAR = {'.': 0, '#': 1, 'S': 2, '~': 3, 'T': 4, 'H': 5}
 TILE_NAME = {0: '空地', 1: '砖', 2: '钢', 3: '河', 4: '树', 5: '基地'}
 PASSABLE = (0, 4)                    # 坦克能过的地形（树林只是盖住坦克）
 
-# 基地本体：和 vga.v 的 HQ_X0/HQ_Y0 = 290/565 的 20x20 精灵一致（格坐标）
-#   精灵画在 290..309 / 565..584，方块中心 = 格 56..63 x 112..117
-HQ_X0, HQ_Y0, HQ_W, HQ_H = 56, 112, 8, 6
+# 基地本体：正好等于 vga.v 里 20x20 金鹰精灵的包围盒（格坐标）
+#   精灵画在 290..309 / 565..584 像素 -> 格 58..61 x 113..116
+#   （290/5 = 58，565/5 = 113，宽高各 4 格）
+# 只有这 4x4 格是 tile 5；关卡文件里的 'H' 块其余格子由 expand() 补成砖，
+# 于是砖墙是紧贴着鹰的，不会出现一圈 40x30 的黑缝。
+HQ_X0, HQ_Y0, HQ_W, HQ_H = 58, 113, 4, 4
 # 出生点（像素）
-PLAYER_SPAWN = (300, 300)
-ENEMY_SPAWNS = ((40, 10), (300, 10), (560, 10))
+#   玩家：基地左侧、贴着底部那一行（原版 Battle City 的玩家 1 出生点位置）。
+#         200 = 格列 40 = 块列 10；560 = 格行 112 = 块行 28 —— 车身正好压 1 块。
+#   敌人：屏幕最上一行，左 / 中 / 右三路；y = 0 让车身严丝合缝地压在第 0 块上
+#         （旧值 10 让车身横跨第 0/1 两块，起步要两拍才对齐）。
+PLAYER_SPAWN = (200, 560)
+ENEMY_SPAWNS = ((40, 0), (300, 0), (560, 0))
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DEFAULT_LEVEL = os.path.join(ROOT, 'pysrc', 'maps', 'level1.txt')
@@ -106,14 +119,39 @@ def expand(rows):
     return cells
 
 
-def rect_free(cells, px, py, size=20):
-    """(px,py) 开始的 size x size 像素区域是否全部可通行"""
+def rect_free(cells, px, py, size=20, clip=False):
+    """(px,py) 开始的 size x size 像素区域是否全部可通行。
+       clip=True 时超出地图的格子直接忽略（出生点贴着画面边缘时用）。"""
     x0, y0 = px // 5, py // 5
     for y in range(y0, y0 + size // 5):
         for x in range(x0, x0 + size // 5):
+            if not (0 <= y < MAP_ROWS and 0 <= x < MAP_COLS):
+                if clip:
+                    continue
+                return False
             if cells[y][x] not in PASSABLE:
                 return False
     return True
+
+
+def tank_reach(cells, start):
+    """把 20x20 的车身当成一个整体，在 5 像素栅格上做 BFS，返回可达坐标集合。
+
+    比 bfs_reach() 严：bfs_reach 只看单格连通，1 块宽的夹缝在格子图上通、
+    20px 的车身却拐不进去；这里每一步都要求 4x4 格全通，和 RTL 里
+    player.v / enemy_ctrl.v 的"整格移动 + 前边缘四格探测"是一回事。"""
+    from collections import deque
+    lim_x, lim_y = MAP_COLS * 5 - 20, MAP_ROWS * 5 - 20
+    seen = {start}
+    q = deque([start])
+    while q:
+        x, y = q.popleft()
+        for nx, ny in ((x + 5, y), (x - 5, y), (x, y + 5), (x, y - 5)):
+            if 0 <= nx <= lim_x and 0 <= ny <= lim_y and (nx, ny) not in seen \
+                    and rect_free(cells, nx, ny):
+                seen.add((nx, ny))
+                q.append((nx, ny))
+    return seen
 
 
 def bfs_reach(cells, start):
@@ -163,12 +201,28 @@ def validate(cells):
     if stray:
         errs.append(f'基地矩形之外还有 {len(stray)} 格 tile 5，例如 {stray[0]}')
 
+    # --- 1b. 砖块必须把基地围起来 ---
+    # 基地本体只有 4x4 格（= 鹰的 20x20 包围盒），上下左右各 1 格必须是砖/钢：
+    # 这样敌人只能先打掉砖墙才摸得到基地，玩家也才有"守家"这件事可做。
+    # 只有地图外沿（基地贴底边那一行）不要求。
+    shell = ([(HQ_X0 - 1, y) for y in range(HQ_Y0, HQ_Y0 + HQ_H)] +
+             [(HQ_X0 + HQ_W, y) for y in range(HQ_Y0, HQ_Y0 + HQ_H)] +
+             [(x, HQ_Y0 - 1) for x in range(HQ_X0, HQ_X0 + HQ_W)] +
+             [(x, HQ_Y0 + HQ_H) for x in range(HQ_X0, HQ_X0 + HQ_W)])
+    leak = [(x, y) for (x, y) in shell
+            if 0 <= x < MAP_COLS and 0 <= y < MAP_ROWS
+            and cells[y][x] not in (TILE_CHAR['#'], TILE_CHAR['S'])]
+    if leak:
+        errs.append(f'基地外壳有 {len(leak)} 格不是砖/钢（坦克能直接摸到基地），'
+                    f'例如 {leak[0]}')
+
     # --- 2. 出生点净空 ---
+    # 玩家出生点贴着画面底部那一行，所以往下的通道会被画面边缘截断，用 clip=True。
     px, py = PLAYER_SPAWN
     if not rect_free(cells, px, py):
         errs.append(f'玩家出生点 {PLAYER_SPAWN} 的 20x20 车身压在墙上')
     for dy in (60, -60):
-        if not rect_free(cells, px, py + dy):
+        if not rect_free(cells, px, py + dy, clip=True):
             errs.append(f'玩家出生点上下 ±{abs(dy)}px 必须空（坦克要能起步）')
     for (ex, ey) in ENEMY_SPAWNS:
         if not rect_free(cells, ex, ey):
@@ -196,6 +250,23 @@ def validate(cells):
                  f'({100.0 * reached / total_open:.1f}%)')
     if reached < total_open:
         notes.append(f'注意：有 {total_open - reached} 格可通行区域玩家走不到（孤岛）')
+
+    # --- 3b. 坦克本体连通性（真正决定"开不开得过去"的那一关）---
+    # 三个敌人出生点必须能开到，而且必须能开到基地砖墙跟前 —— 否则敌人
+    # 会卡在半路原地转圈（AI 是贪心的：只看"下一步能不能走"）。
+    reach = tank_reach(cells, PLAYER_SPAWN)
+    for (ex, ey) in ENEMY_SPAWNS:
+        if (ex, ey) not in reach:
+            errs.append(f'敌人出生点 ({ex},{ey}) 的 20x20 车身开不到（通道太窄）')
+    # 基地三面的"贴脸位置"：左 / 右 / 正上方各一处（就是敌人能打到基地的位置）。
+    # 堡垒占块 13~16 x 26~29（x 260~339 / y 520~599），所以三个贴脸位置正好是
+    # 块 (12,28) / (17,28) / (15,25)，起点都是整块的倍数。
+    for name, (tx, ty) in (('基地左侧', (240, 560)),
+                           ('基地右侧', (340, 560)),
+                           ('基地正上方', (300, 500))):
+        if (tx, ty) not in reach:
+            errs.append(f'{name} 贴脸位置 ({tx},{ty}) 的 20x20 车身开不到')
+    notes.append(f'坦克可达位置 {len(reach)} 个（20x20 车身整体 BFS）')
 
     hist = {}
     for y in range(MAP_ROWS):

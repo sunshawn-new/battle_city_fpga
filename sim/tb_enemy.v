@@ -17,16 +17,20 @@
 //   2 号 右边 装甲 : 步进 = MOVE_DIV*3、每 8 拍开一炮、要挨 2 发
 //
 // 覆盖的场景：
-//   E00 出生点 / 朝向 / 兵种 / 全部存活
+//   E00 出生点 / 朝向 / 兵种 / 全部存活（(40,0)/(300,0)/(560,0)，贴最上面一块）
 //   E01 每个移动节拍走一整格（5px），坐标始终在格点上
 //   E02 三个 terrain_probe 同时挂在 map_bus 上，各自读到的地形不能串台
-//   E03 正前方是砖：原地转 90°，绝不走进墙里，转向后能继续走
+//   E03 正前方是砖：不撞墙，且第一个尝试的方向是“朝基地”（不是随机乱转）
 //   E04 玩家查询（p_req[0]）在 4 个客户端抢总线时依然正常
 //   E05 长时间跑：坐标始终在格点/边界内，车身 4x4 格永远不会压在硬地形上
 //   E06 兵种速度差异：三个节拍周期分别是 200 / 400 / 600 拍
 //   E07 兵种开火周期差异：6 / 4 / 8 个“自己的移动节拍”
 //   E08 装甲要挨两发；全灭 -> victory 相关信号（e_kill 单拍）
 //   E09 freeze=1（GAME OVER）之后敌人不再移动
+//   E10 四面都不通的口袋：四方向试错按固定顺序循环（顶边也算墙，不会钉死）
+//   E11 互斥端口接线：player <- enemy 的坐标、enemy <- player 的坐标都在 top 里接上
+//   E12 tank_block 单元测试：20x20 包围盒的“贴边不算重叠 / 5px 就算重叠”
+//   E13 集成：玩家挡在下坡通道里，敌人开不过来（不会穿模），玩家让开就能过
 // ============================================================================
 module tb_enemy;
     localparam MOVE_DIV   = 200;
@@ -38,6 +42,17 @@ module tb_enemy;
         input integer row;
         begin
             A = row * MAP_W + col;
+        end
+    endfunction
+
+    // 关卡 ROM 里的“块地址”：第 1 关的基址是 0，一块 = 4x4 格 = 20x20 像素。
+    // 复位期间改这里 -> level_loader 会把改过的块展开写进地图 RAM，
+    // 于是敌人出场后的第一次地形扫描就已经看到改过的地图（没有“上一拍旧值”的问题）。
+    function [11:0] BR;
+        input integer bx;      // 块列 0..29
+        input integer by;      // 块行 0..29
+        begin
+            BR = by * 30 + bx;
         end
     endfunction
 
@@ -66,6 +81,9 @@ module tb_enemy;
 
     integer errors = 0;
     integer k, j;
+    integer i10, n_chg, n_up, n_dn, n_lf, n_rt;   // E10：方向试错的采样统计
+    reg [1:0] prev_dir, got_dir;                  // E10：方向切换的比对
+    reg ok_pair;
 
     task do_reset;
         begin
@@ -73,7 +91,24 @@ module tb_enemy;
             btn_up = 0; btn_down = 0; btn_left = 0; btn_right = 0;
             repeat (10) @(posedge clock);
             reset = 1'b0;
-            repeat (150) @(posedge clock);   // 玩家+3 辆敌人的 probe 各扫一遍
+            // 复位后 stage_ctrl 走 S_LOAD：level_loader 要把第 1 关地图整张重写一遍
+            // （900 块 x 18 拍 ≈ 16200 拍）。这段期间 paused=1，玩家/敌人/炮弹全冻结，
+            // 敌人的 probe 也一直在复位。必须等它装完才能看到真实地形。
+            wait_load;
+            // 敌人出场是 paused 落下之后的头几拍，再给 probe 留一轮扫描时间，
+            // 这样后面“敌人是不是已经动了”的判断才有意义。
+            repeat (150) @(posedge clock);
+        end
+    endtask
+
+    // 等地图装载结束（stage_paused 落回 0）。冷启动/重开都会走这一趟。
+    task wait_load;
+        integer n;
+        begin
+            n = 0;
+            while (u_top.stage_paused && n < 200000) begin
+                @(posedge clock); n = n + 1;
+            end
         end
     endtask
 
@@ -127,6 +162,16 @@ module tb_enemy;
         begin
             @(negedge clock);
             u_top.u_map_ram.mem[idx] = val;
+        end
+    endtask
+
+    // 改关卡 ROM 的块图（只在 reset=1 期间用，装载器会把它展开写进地图）
+    task poke_blk;
+        input [11:0] idx;
+        input [3:0]  val;
+        begin
+            @(negedge clock);
+            u_top.u_level_rom.mem[idx] = val;
         end
     endtask
 
@@ -300,11 +345,66 @@ module tb_enemy;
         end
     endtask
 
+    // ---------------- E12 用到的 tank_block 单元（纯组合，不接 top）----------------
+    // 直接搭一份独立实例，把候选坐标 / 障碍物坐标手工喂进去，
+    // 这样“重叠”的判定边界（贴边 vs 5px）可以逐个点验证，不依赖地图和 AI。
+    reg  [9:0] ub_cx, ub_cy;
+    reg  [3:0] ub_v;
+    reg [39:0] ub_x, ub_y;
+    wire       ub_blocked;
+
+    tank_block #(.N(4)) u_blk_ut (
+        .cx(ub_cx), .cy(ub_cy),
+        .o_valid(ub_v), .o_x(ub_x), .o_y(ub_y), .blocked(ub_blocked)
+    );
+
+    // 设好一组输入 -> 等 1ns（组合逻辑稳定）-> 比对 blocked
+    // 障碍物 i 的坐标 / 在场位用“第 i 个槽”的 10 位片段传，未用到的槽给 0 / 不在场。
+    task blk_check;
+        input [8*46-1:0] name;
+        input [9:0]      cx, cy;
+        input [3:0]      v;
+        input [39:0]     ox, oy;
+        input            exp;
+        begin
+            ub_cx = cx; ub_cy = cy; ub_v = v; ub_x = ox; ub_y = oy;
+            #1;
+            if (ub_blocked !== exp) begin
+                errors = errors + 1;
+                $display("[FAIL] %0s : blocked=%b, expected %b (cand %0d,%0d)",
+                         name, ub_blocked, exp, cx, cy);
+            end else begin
+                $display("[ OK ] %0s : blocked=%b", name, ub_blocked);
+            end
+        end
+    endtask
+
+    // 把 4 个障碍物都设成“不在场”，只改动其中指定的槽（省得每次都写 40 位常量）
+    task blk_case;
+        input [8*46-1:0] name;
+        input [9:0]      cx, cy;      // 本车候选位置
+        input integer    slot;        // 障碍物放在第几个槽（0..3）
+        input [9:0]      ox, oy;      // 障碍物坐标
+        input            valid;       // 障碍物是否在场
+        input            exp;
+        reg [39:0] vx, vy;
+        reg [3:0]  vv;
+        begin
+            vx = 40'd0; vy = 40'd0; vv = 4'd0;
+            vx[slot*10 +: 10] = ox;
+            vy[slot*10 +: 10] = oy;
+            vv[slot]          = valid;
+            blk_check(name, cx, cy, vv, vx, vy, exp);
+        end
+    endtask
+
+
     integer kills = 0;
     always @(posedge clock) if (|u_top.enemy_kill) kills = kills + 1;
 
     integer period0, period1, period2;
     integer k0;
+    integer exv, eyv, dxv, dyv;      // E13：敌人/玩家坐标差的绝对值（32 位有符号算，避免 10 位回绕）
 
     initial begin
         $display("=========== enemy tank test ===========");
@@ -317,9 +417,9 @@ module tb_enemy;
         end else begin
             $display("[ OK ] E00a all 3 enemies alive");
         end
-        check_enemy_pos("E00b spawn left",   0, 10'd40,  10'd10);
-        check_enemy_pos("E00c spawn middle", 1, 10'd300, 10'd10);
-        check_enemy_pos("E00d spawn right",  2, 10'd560, 10'd10);
+        check_enemy_pos("E00b spawn left",   0, 10'd40,  10'd0);
+        check_enemy_pos("E00c spawn middle", 1, 10'd300, 10'd0);
+        check_enemy_pos("E00d spawn right",  2, 10'd560, 10'd0);
         check_dir("E00e face down", 0, 2'b01);
         check_dir("E00f face down", 1, 2'b01);
         check_dir("E00g face down", 2, 2'b01);
@@ -332,45 +432,53 @@ module tb_enemy;
         // 注意：三个兵种的 STEP 不一样，所以不能用 step_all（等慢车的节拍时
         // 快车已经多走了好几格）。这里每辆车各自复位、各自数自己的节拍。
         do_reset; step_enemy(0, 4);
-        check_enemy_pos("E01a down 4 cells", 0, 10'd40,  10'd30);
+        check_enemy_pos("E01a down 4 cells", 0, 10'd40,  10'd20);
         check_grid("E01d on 5px grid", 0);
 
         do_reset; step_enemy(1, 4);
-        check_enemy_pos("E01b down 4 cells", 1, 10'd300, 10'd30);
+        check_enemy_pos("E01b down 4 cells", 1, 10'd300, 10'd20);
         check_grid("E01e on 5px grid", 1);
 
         do_reset; step_enemy(2, 4);
-        check_enemy_pos("E01c down 4 cells", 2, 10'd560, 10'd30);
+        check_enemy_pos("E01c down 4 cells", 2, 10'd560, 10'd20);
         check_grid("E01f on 5px grid", 2);
 
         // ---------------- E02 三个 probe 读地形不能串台 ----------------
-        // 复位期间把三辆车正前方 poke 成不同地形，再放开 reset：
-        // 每个 probe 的第一次扫描就会各读各的格子，地址一旦串了这里立刻炸。
+        // 复位期间直接改关卡 ROM 的块图，装载器会把这三块展开写进地图 RAM：
+        //   块(2,1)  -> 0 号车（x=40，格列 8~11）正前方 4 格全是砖
+        //   块(15,1) -> 1 号车（x=300，格列 60~63）正前方 4 格全是钢
+        //   块(28,1) -> 2 号车（x=560，格列 112~115）不 poke，保持空地
+        // 这样三辆车出场后的第一次扫描就各读各的格子，地址一旦串了这里立刻炸。
+        // （在 reset 期间改 ROM 而不是改地图 RAM：场地是在装载时才写进去的，
+        //   装载完再 poke 会让第一拍用“上一拍读到的旧地形”，逻辑上不干净。）
         reset = 1'b1;
         repeat (5) @(posedge clock);
-        for (j = 8;  j <= 11;  j = j + 1) poke(A(j, 6), 4'd1);   // 行6 列8~11  : 砖
-        for (j = 60; j <= 63;  j = j + 1) poke(A(j, 6), 4'd2);   // 行6 列60~63 : 钢
-        // 敌人 2 正前方（行6 列112~115）留空地 0
-        repeat (5) @(posedge clock);
+        poke_blk(BR(2,  1), 4'd1);      // 砖
+        poke_blk(BR(15, 1), 4'd2);      // 钢
         reset = 1'b0;
-        repeat (150) @(posedge clock);          // 3 个 probe 轮流扫一遍（每个约 30 拍）
+        wait_load;
+        repeat (150) @(posedge clock);          // 装载完 + 3 个 probe 各扫一遍
         check_front("E02a front=brick", 0, 4'd1);
         check_front("E02b front=steel", 1, 4'd2);
         check_front("E02c front=empty", 2, 4'd0);
-        check_enemy_pos("E02d no move before tick", 0, 10'd40, 10'd10);
+        check_enemy_pos("E02d no move before tick", 0, 10'd40, 10'd0);
 
-        // ---------------- E03 前面是砖：原地转 90°，不撞墙 ----------------
+        // ---------------- E03 前面是砖：不撞墙，且第一个尝试的是"朝基地" ----------------
+        // 车在 (40,0)，基地在 x=300（右侧）、y=560（下方）；纵向离得更远，
+        // 所以 want=下、slide=右。撞墙后第一个试的方向就是 slide=右 ——
+        // 这就是"敌人会去进攻基地"，而不是旧版那种随机 90° 乱转。
         step_enemy(0, 1);
-        if (u_top.enemy_dir[1:0] === 2'b01) begin
+        if (u_top.enemy_dir[1:0] !== 2'b11) begin
             errors = errors + 1;
-            $display("[FAIL] E03a enemy0 still faces down after hitting brick");
+            $display("[FAIL] E03a enemy0 dir=%b after hitting brick, expected 11 (toward base)",
+                     u_top.enemy_dir[1:0]);
         end else begin
-            $display("[ OK ] E03a enemy0 turned to dir=%b", u_top.enemy_dir[1:0]);
+            $display("[ OK ] E03a enemy0 turned toward the base (dir=11)");
         end
-        check_enemy_pos("E03b not inside brick", 0, 10'd40, 10'd10);
+        check_enemy_pos("E03b not inside brick", 0, 10'd40, 10'd0);
 
         step_enemy(0, 2);
-        if (u_top.enemy_x[9:0] === 10'd40 && u_top.enemy_y[9:0] === 10'd10) begin
+        if (u_top.enemy_x[9:0] === 10'd40 && u_top.enemy_y[9:0] === 10'd0) begin
             errors = errors + 1;
             $display("[FAIL] E03c enemy0 stuck at spawn after turning");
         end else begin
@@ -385,9 +493,9 @@ module tb_enemy;
         btn_up = 1'b1;
         step_player(10);
         btn_up = 1'b0;
-        if (u_top.player_x !== 10'd300 || u_top.player_y !== 10'd290) begin
+        if (u_top.player_x !== 10'd200 || u_top.player_y !== 10'd550) begin
             errors = errors + 1;
-            $display("[FAIL] E04a player got (%0d,%0d), expected (300,290)",
+            $display("[FAIL] E04a player got (%0d,%0d), expected (200,550)",
                      u_top.player_x, u_top.player_y);
         end else begin
             $display("[ OK ] E04a player still moves with 4 probes on the bus");
@@ -476,6 +584,194 @@ module tb_enemy;
                      u_top.enemy_x[9:0], u_top.enemy_y[9:0]);
         end
         release u_top.game_over;
+
+        // ---------------- E10 四面是墙的口袋：四方向试错必须全覆盖 ----------------
+        // 0 号车出生在 (40,0)（车身 = 格列 8~11 x 格行 0~3）。用关卡 ROM 给它造一个
+        // “看起来上面是空的、其实是画面外”的口袋：
+        //   下：块(2,1) 砖（E02 已经注过，这里再写一次，让本用例不依赖执行顺序）
+        //   左：块(1,0) 砖（格列 7）      右：块(3,0) 砖（格列 12）
+        //   上：y = 0 -> 车身已经贴住画面顶边，外面那行不存在
+        // 撞墙后的试错顺序是 ①朝基地滑 ②反向滑 ③掉头 ④主轴；每转完一圈 slide_q
+        // 会翻转，所以 ① ② 的左右顺序隔一圈换一次，dir 的周期是 8 拍：
+        //   右 -> 左 -> 上 -> 下 -> 左 -> 右 -> 上 -> 下 -> ...（位置一步不动）。
+        // 【这条用例守着 terrain_probe 的一个坑】：越界的“前方行列”如果被夹回
+        // 车身自己身上（y=0 朝上时 g_front_up 夹到第 0 行），probe 会报“空地”，
+        // 车于是选“上”、发现 y==0 走不动、stuck 又清零 —— 永远钉在顶边朝上。
+        reset = 1'b1;
+        repeat (5) @(posedge clock);
+        poke_blk(BR(2, 1), 4'd1);       // 下
+        poke_blk(BR(1, 0), 4'd1);       // 左
+        poke_blk(BR(3, 0), 4'd1);       // 右
+        reset = 1'b0;
+        wait_load;
+        repeat (150) @(posedge clock);  // 装载完 + probe 扫一遍
+        check_enemy_pos("E10a trapped at spawn", 0, 10'd40, 10'd0);
+        // 采样 40 个移动节拍，只看“方向发生切换”的那些拍（probe 重扫时会有一拍
+        // 不切换，属于正常现象）。要求：
+        //   ① 切换次数够多 —— 旧版撞到顶边会永远朝上（stuck 被清零），几乎不切换；
+        //   ② 每次切换都必须是固定的四种试探顺序里的相邻两态；
+        //   ③ 四个方向都被试到过。
+        n_chg = 0; n_up = 0; n_dn = 0; n_lf = 0; n_rt = 0;
+        step_enemy(0, 1);                       // 先走一拍，进入“卡住后的试错”状态
+        prev_dir = u_top.enemy_dir[1:0];
+        for (i10 = 0; i10 < 40; i10 = i10 + 1) begin
+            step_enemy(0, 1);
+            got_dir = u_top.enemy_dir[1:0];
+            if (got_dir !== prev_dir) begin
+                n_chg = n_chg + 1;
+                case (got_dir)
+                    2'b00: n_up = n_up + 1;
+                    2'b01: n_dn = n_dn + 1;
+                    2'b10: n_lf = n_lf + 1;
+                    default: n_rt = n_rt + 1;
+                endcase
+                // 允许的相邻两态：右->左、左->上、上->下、下->左、左->右、右->上、下->右
+                case ({prev_dir, got_dir})
+                    4'b1110, 4'b1000, 4'b0001, 4'b0110,
+                    4'b1011, 4'b1100, 4'b0111: ok_pair = 1'b1;
+                    default:                   ok_pair = 1'b0;
+                endcase
+                if (!ok_pair) begin
+                    errors = errors + 1;
+                    $display("[FAIL] E10b illegal turn %b -> %b (four-way trial order)", prev_dir, got_dir);
+                end
+                prev_dir = got_dir;
+            end
+        end
+        if (n_chg < 12) begin
+            errors = errors + 1;
+            $display("[FAIL] E10c only %0d turns in 40 ticks -> tank is pinned (top edge not treated as wall?)", n_chg);
+        end else begin
+            $display("[ OK ] E10c %0d turns in 40 ticks", n_chg);
+        end
+        if (n_up == 0 || n_dn == 0 || n_lf == 0 || n_rt == 0) begin
+            errors = errors + 1;
+            $display("[FAIL] E10d four-way trial coverage: up=%0d down=%0d left=%0d right=%0d",
+                     n_up, n_dn, n_lf, n_rt);
+        end else begin
+            $display("[ OK ] E10d all four directions tried: up=%0d down=%0d left=%0d right=%0d",
+                     n_up, n_dn, n_lf, n_rt);
+        end
+        check_enemy_pos("E10e still trapped (no wall punched through)", 0, 10'd40, 10'd0);
+        check_not_in_wall("E10f body on passable tiles", 0);
+
+        // ---------------- E11 坦克互斥的接线 ----------------
+        // 两处连线是“穿模修复”的一半工作量，接错一头编译照样过：
+        //   top: .p_x(player_x) / .p_y(player_y)          -> enemy_ctrl 看到玩家在哪
+        //   top: .blk_valid(enemy_valid) / .blk_x(enemy_x) / .blk_y(enemy_y) -> player 看到敌人
+        // 这里直接比顶层网线（同一根线，比较的是“有没有接/接错”）。
+        @(negedge clock);
+        if (u_top.u_enemy_ctrl.p_x !== u_top.player_x ||
+            u_top.u_enemy_ctrl.p_y !== u_top.player_y) begin
+            errors = errors + 1;
+            $display("[FAIL] E11a enemy_ctrl.p_x/p_y not wired to player_x/y (%0d,%0d vs %0d,%0d)",
+                     u_top.u_enemy_ctrl.p_x, u_top.u_enemy_ctrl.p_y,
+                     u_top.player_x, u_top.player_y);
+        end else begin
+            $display("[ OK ] E11a enemy_ctrl sees the player at (%0d,%0d)",
+                     u_top.player_x, u_top.player_y);
+        end
+        if (u_top.u_player.blk_valid !== u_top.enemy_valid ||
+            u_top.u_player.blk_x     !== u_top.enemy_x     ||
+            u_top.u_player.blk_y     !== u_top.enemy_y) begin
+            errors = errors + 1;
+            $display("[FAIL] E11b player.blk_* not wired to enemy_valid/x/y");
+        end else begin
+            $display("[ OK ] E11b player sees the %0d enemy boxes", 3);
+        end
+        // 玩家侧四个方向各有一份判定实例：哪一根漏接，那个方向就能穿过敌人。
+        if (u_top.u_player.u_blk_up.o_valid !== u_top.enemy_valid ||
+            u_top.u_player.u_blk_dn.o_valid !== u_top.enemy_valid ||
+            u_top.u_player.u_blk_lf.o_valid !== u_top.enemy_valid ||
+            u_top.u_player.u_blk_rt.o_valid !== u_top.enemy_valid) begin
+            errors = errors + 1;
+            $display("[FAIL] E11c one of the 4 player tank_block instances is not wired to blk_valid");
+        end else begin
+            $display("[ OK ] E11c all 4 player tank_block instances see blk_valid");
+        end
+
+        // ---------------- E12 tank_block 单元测试 ----------------
+        // 判据：车身 20x20，两个车身“重叠”等价于 |dx| < 20 && |dy| < 20。
+        // 贴边（dx 或 dy 正好 = 20）必须放行，否则两辆车并排站着都会互相挡。
+        blk_case("E12a tail-to-nose (dy=20) ok",  10'd100, 10'd120, 0, 10'd100, 10'd100, 1'b1, 1'b0);
+        blk_case("E12b overlap 5px (dy=15)",      10'd100, 10'd115, 0, 10'd100, 10'd100, 1'b1, 1'b1);
+        blk_case("E12c nose into tail (dy=-15)",  10'd100, 10'd85,  0, 10'd100, 10'd100, 1'b1, 1'b1);
+        blk_case("E12d side-by-side (dx=20) ok",  10'd120, 10'd100, 0, 10'd100, 10'd100, 1'b1, 1'b0);
+        blk_case("E12e sideways 5px (dx=15)",     10'd115, 10'd100, 0, 10'd100, 10'd100, 1'b1, 1'b1);
+        blk_case("E12f diagonal 15/15 overlaps",  10'd115, 10'd115, 0, 10'd100, 10'd100, 1'b1, 1'b1);
+        blk_case("E12g diagonal 25/25 clear",     10'd125, 10'd125, 0, 10'd100, 10'd100, 1'b1, 1'b0);
+        blk_case("E12h dead enemy ignored",       10'd100, 10'd100, 0, 10'd100, 10'd100, 1'b0, 1'b0);
+        // 第 4 个槽也要参与判定（N 路 OR 少一路，编号最大的那辆敌人就能被穿过）
+        blk_case("E12i slot 3 overlaps",          10'd100, 10'd105, 3, 10'd100, 10'd100, 1'b1, 1'b1);
+        // 玩家朝上时 position_y - 5 在 y=0 会回绕成 1020 那种大数：不能误判成“有车”
+        blk_case("E12j wrapped cand (1020) clear",10'd1020, 10'd1020, 0, 10'd0, 10'd0, 1'b1, 1'b0);
+
+        // ---------------- E13 集成：玩家挡住下坡通道，敌人不能开过来 ----------------
+        // 造一条 1 块宽的竖直通道：块列 2（x 40..59）整列向下打通，
+        // 左右两侧（块列 1 / 3）整列用砖封死，顶上就是画面外沿 ——
+        // 于是 0 号车除了“向下”没有别的出路。玩家先被 force 到 (40,60) 站在通道里：
+        //   车到 y=40 时车身 40..59，玩家 60..79 -> 刚好贴边，允许；
+        //   再往下候选 y=45 -> 45..64 和玩家重叠 5px -> 必须被挡住。
+        // 然后把玩家 force 走（搬到出生点），同一条通道应该立刻恢复畅通。
+        // 这就是“坦克互相穿过”的回归用例：拆掉 tank_block 时它会一路开到 y=60 以上。
+        // 注意两侧的墙必须自己 poke：真实地图里块列 3 正好是 A 相位的走廊，
+        // 不封死的话车会从旁边绕下去（第一版用例就是这样漏过去的）。
+        reset = 1'b1;
+        repeat (5) @(posedge clock);
+        for (j = 0; j <= 5; j = j + 1) begin
+            poke_blk(BR(1, j), 4'd1);   // 左墙
+            poke_blk(BR(3, j), 4'd1);   // 右墙
+            poke_blk(BR(2, j), 4'd0);   // 通道
+        end
+        reset = 1'b0;
+        // 玩家站位在装载完成后才 force：level 装载期间玩家会被 respawn 拉回出生点
+        wait_load;
+        force u_top.player_x = 10'd40;
+        force u_top.player_y = 10'd60;
+        repeat (150) @(posedge clock);  // probe 扫一遍
+        check_enemy_pos("E13a enemy starts at spawn", 0, 10'd40, 10'd0);
+        step_enemy(0, 8);               // 8 拍正好从 y=0 一格一格开到 y=40
+        check_enemy_pos("E13b stopped in front of the player", 0, 10'd40, 10'd40);
+        // 再抽 20 拍：位置可以变（撞车后它会像撞墙一样换方向），
+        // 但 y 绝不能越过 40，也不能和玩家重叠（那 5px 就是穿模）。
+        k0 = 0;                          // 违规次数
+        for (i10 = 0; i10 < 20; i10 = i10 + 1) begin
+            step_enemy(0, 1);
+            eyv = u_top.enemy_y[9:0];
+            if (eyv > 40) k0 = k0 + 1;   // 越过 y=40 = 从玩家身上开过去了
+            exv = u_top.enemy_x[9:0];
+            dxv = exv - u_top.player_x;  // |dx| < 20 且 |dy| < 20 就是两车重叠
+            dyv = eyv - u_top.player_y;
+            if (dxv < 0) dxv = -dxv;
+            if (dyv < 0) dyv = -dyv;
+            if ((dxv < 20) && (dyv < 20)) k0 = k0 + 1;
+        end
+        if (k0 != 0) begin
+            errors = errors + 1;
+            $display("[FAIL] E13c enemy clipped into the player %0d times (enemy %0d,%0d / player %0d,%0d)",
+                     k0, u_top.enemy_x[9:0], u_top.enemy_y[9:0],
+                     u_top.player_x, u_top.player_y);
+        end else begin
+            $display("[ OK ] E13c enemy never overlapped the player");
+        end
+        check_not_in_wall("E13d enemy body on passable tiles", 0);
+        // 把玩家搬走（仍然 force，避免 release 之后寄存器回到哪个值的不确定性）：
+        // 还是同一条通道，这回必须能开过去 -> 证明上一步是被“车”挡住的，不是地形。
+        force u_top.player_x = 10'd200;
+        force u_top.player_y = 10'd560;
+        k0 = u_top.enemy_y[9:0];
+        for (i10 = 0; i10 < 30; i10 = i10 + 1) begin
+            step_enemy(0, 1);
+            if (u_top.enemy_y[9:0] > k0) k0 = u_top.enemy_y[9:0];
+        end
+        if (k0 <= 10'd40) begin
+            errors = errors + 1;
+            $display("[FAIL] E13e enemy still stuck at y=%0d after the player moved away", k0);
+        end else begin
+            $display("[ OK ] E13e enemy drove past y=40 (max y=%0d) once free", k0);
+        end
+        release u_top.player_x;
+        release u_top.player_y;
 
         $display("==============================================");
         if (errors == 0) $display("ALL TESTS PASSED");

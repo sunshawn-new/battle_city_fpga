@@ -16,9 +16,13 @@ module top #(
     parameter FIRE_TICKS = 4,
     // 初始生命数（GAME OVER 条件之一）
     parameter LIVES_START = 3,
-    // 复活后的无敌时间（时钟数）：1s @100MHz。无敌期间不会再被打中。
-    // 仿真里改小（不然一个用例要跑 1 亿拍）。
-    parameter INVULN_CYCLES = 100_000_000,
+    // 复活后的无敌时间（时钟数）：2.5s @100MHz。
+    // 以前是 1s，实战里刚复活还没来得及躲开就被第二发打穿；原版的复活保护
+    // 大约是 3 秒（车在闪）。现在改成 2.5s **并且让车身闪烁**（见 player_blink），
+    // 玩家一眼就能看出“现在打不中我”。
+    // 28 位计数器上限 268_435_455 拍，2.5s = 250_000_000 拍，正好装得下。
+    // 仿真里改小（不然一个用例要跑 2.5 亿拍）。
+    parameter INVULN_CYCLES = 250_000_000,
     // 敌人开火总开关：1 = 正常（板上默认），0 = 敌人不开火。
     // 地形/移动那几个老用例不关心战斗，关掉它才能保证结果可复现。
     parameter ENEMY_FIRE = 1,
@@ -57,12 +61,22 @@ module top #(
     wire       terrain_valid;
     wire       move_tick;              // 坦克的移动节拍（25Hz），用来定期刷新地形查询
 
+    // 敌方坦克的“打包”接口（VGA / 炮弹 / 互斥判定都要用）。
+    // 以前这组线声明在 player 实例下面；现在玩家要做坦克互斥，得先看到它们，
+    // 所以统一提到这里声明。
+    wire [N_ENEMY-1:0]    enemy_valid;          // 1 = 这辆车还在（VGA 画不画）
+    wire [N_ENEMY*10-1:0] enemy_x, enemy_y;
+    wire [N_ENEMY*2-1:0]  enemy_dir;
+    wire [N_ENEMY*2-1:0]  enemy_type;           // 每辆车的兵种（VGA 用它选贴图）
+    wire [N_ENEMY-1:0]    enemy_move_tick;      // 每辆车自己的移动节拍
+
     // 生命 / 分数 / 结算状态（HUD 和玩法共用）
     //   lives     : 还剩几条命（3 -> 0）；归零立刻 GAME OVER
     //   score100  : 分数 / 100（每辆敌人 +1/+2/+3 -> 100/200/300 分）；
     //               因为分数永远是 100 的倍数，HUD 直接用十进制显示 nn00，
     //               省掉一个 16 位 /10 除法器（见 hud.v 的说明）
-    //   game_over : 基地被打爆 或 生命耗尽，锁存（本工程没有重开一局）
+    //   game_over : 基地被打爆 或 生命耗尽，锁存；GAME OVER 之后按 BTNC 重开一局
+    //                （见下面的 restart_pulse），不用去按板上的复位键
     //   level     : 关卡号（1..N_LEVELS），由 stage_ctrl 维护，HUD 显示 LEVEL n
     //   stage_clear : 本关打完（显示 STAGE CLEAR 横幅 2s，然后换下一关）
     reg [1:0] lives     = LIVES_START;
@@ -70,8 +84,48 @@ module top #(
     reg       game_over = 1'b0;
     reg [27:0] invuln_cnt = 28'd0;     // 复活无敌倒计时
     reg        respawn_pulse = 1'b0;
-    wire       player_invuln = (invuln_cnt != 28'd0);
+    // 【为什么要多一个 invuln_q 寄存器】
+    //   语义上 player_invuln 就是 (invuln_cnt != 0)，但把它写成 28 位归零比较
+    //   直接往外送，会拉出一条“28 位 OR 归约（3~4 级 LUT）-> player_alive ->
+    //   fx_ctrl 的爆炸槽仲裁 -> bx_reg/CE”的长路径：实测 9 级逻辑 + 8.6ns 路由
+    //   （WNS = -0.72ns，最后的唯一违例）。
+    //   invuln_q 在同一个 else 分支里按“倒计时的下一拍值”更新，逐拍和
+    //   (invuln_cnt != 0) 完全一致（0 拍的差别都没有），但输出是触发器 ——
+    //   28 位比较只喂旁边这个 flop，长路径从 flop 出发，时序立刻就松了。
+    //   反向也顺便修好了：player_alive 是 bullet_ctrl 的输入，同样吃这条长路径。
+    reg        invuln_q = 1'b0;
+    wire       player_invuln = invuln_q;
     wire       player_alive  = ~game_over & ~player_invuln;
+
+    // ---------------- 无敌期间的闪烁（原版 Battle City 的复活保护就是闪的）----------------
+    // blink_cnt 是一个自由计数器，取第 22 位当日志：
+    //   100MHz / 2^22 ≈ 24Hz 翻转一次 -> 12Hz 的“亮/灭”，肉眼很清楚，
+    //   又不会闪到看不清车在哪。只有无敌时 vga 才把玩家坦克藏起来（player_hide）。
+    reg [22:0] blink_cnt = 23'd0;
+    always @(posedge clock) begin
+        if (reset) blink_cnt <= 23'd0;
+        else       blink_cnt <= blink_cnt + 23'd1;
+    end
+    wire player_blink = player_invuln & blink_cnt[22];
+
+    // ---------------- 重开一局：GAME OVER 后按 BTNC（开火键）----------------
+    // 以前 GAME OVER 是死锁状态（freeze=1 把所有人冻住，只有板上复位键能救），
+    // 而复位键又只清了寄存器、没重装地图（BRAM 里留着打掉的砖），所以“重开”
+    // 实际上是坏的。现在做两件事：
+    //   1. 这里把开火键的上升沿检出来，game_over 期间按一下就产生 restart_pulse；
+    //   2. restart_pulse 复位所有游戏状态（生命/分数/基地/敌人/炮弹/特效），
+    //      并让 stage_ctrl 重新装载第 1 关地图（见 stage_ctrl.v / level_loader.v）。
+    // 注意用上升沿而不是电平：玩家死亡那一拍可能正按着开火键，电平会把
+    // GAME OVER 立刻跳掉。
+    reg  fire_d = 1'b0;
+    always @(posedge clock) begin
+        if (reset) fire_d <= 1'b0;
+        else       fire_d <= btn_fire;
+    end
+    wire fire_rise     = btn_fire & ~fire_d;
+    wire restart_pulse = game_over & fire_rise;   // 单拍
+    // 玩家/敌人/炮弹/特效共用的“硬复位”：板上复位键 或 重开
+    wire sys_rst = reset | restart_pulse;
 
     // ---------------- 关卡流程（stage_ctrl.v）----------------
     wire [2:0]           level;             // 当前关卡号
@@ -87,13 +141,14 @@ module top #(
 
     // paused 期间：玩家/敌人/炮弹全停，probe 复位（装载地图时不能有人查地图）
     wire freeze     = game_over | stage_paused;
-    wire probe_rst  = reset | stage_paused;
-    wire bullet_rst = reset | stage_paused;
+    wire probe_rst  = sys_rst | stage_paused;
+    wire bullet_rst = sys_rst | stage_paused;
     wire player_respawn = respawn_pulse | lvl_respawn;
 
     player #(
         .MOVE_DIV(MOVE_DIV), .TILE(TILE),
-        .WIDTH(PLAY_W), .HEIGHT(MAP_H * TILE)
+        .WIDTH(PLAY_W), .HEIGHT(MAP_H * TILE),
+        .N_BLK(N_ENEMY)
     ) u_player(
         .clock(clock), .reset(reset),
         .up_enable(btn_up), .down_enable(btn_down),
@@ -101,6 +156,8 @@ module top #(
         .position_x(player_x), .position_y(player_y),
         .terrain_in_front(player_terrain_in_front),
         .terrain_valid(terrain_valid),
+        // 坦克互斥：玩家不能开进敌方坦克占着的那一格
+        .blk_valid(enemy_valid), .blk_x(enemy_x), .blk_y(enemy_y),
         .respawn(player_respawn), .freeze(freeze),
         .move_tick(move_tick)
     );
@@ -163,11 +220,6 @@ module top #(
     assign p_addr[0 +: 15] = probe_addr;
 
     // ---- 客户端 1..N：敌方坦克 ----
-    wire [N_ENEMY-1:0]    enemy_valid;          // 1 = 这辆车还在（VGA 画不画）
-    wire [N_ENEMY*10-1:0] enemy_x, enemy_y;
-    wire [N_ENEMY*2-1:0]  enemy_dir;
-    wire [N_ENEMY*2-1:0]  enemy_type;           // 每辆车的兵种（VGA 用它选贴图）
-    wire [N_ENEMY-1:0]    enemy_move_tick;      // 每辆车自己的移动节拍
     wire [N_ENEMY-1:0]    enemy_terrain_valid;
     wire [N_ENEMY*4-1:0]  enemy_terrain_front;
 
@@ -208,11 +260,13 @@ module top #(
         .N_E(N_ENEMY), .WIDTH(PLAY_W), .HEIGHT(MAP_H * TILE), .TILE(TILE),
         .MOVE_DIV(MOVE_DIV * 2), .TURN_TICKS(TURN_TICKS), .FIRE_TICKS(FIRE_TICKS)
     ) u_enemy_ctrl (
-        .clock(clock), .reset(reset),
+        .clock(clock), .reset(sys_rst),
         .spawn(enemy_spawn), .spawn_type(enemy_spawn_type),
         .terrain_front(enemy_terrain_front),
         .terrain_valid(enemy_terrain_valid),
         .move_tick(enemy_move_tick),
+        // 坦克互斥：敌人不能开进玩家那一格（其它敌人的位置在 enemy_ctrl 内部互传）
+        .p_x(player_x), .p_y(player_y),
         .e_hit(enemy_hit), .freeze(freeze),
         .e_fire(enemy_fire), .e_kill(enemy_kill),
         .e_valid(enemy_valid),
@@ -267,7 +321,7 @@ module top #(
         .N_FX(N_FX), .N_E(N_ENEMY),
         .FX_DIV(FX_DIV), .FX_PHASES(6)
     ) u_fx_ctrl (
-        .clock(clock), .reset(reset),
+        .clock(clock), .reset(sys_rst),
         .e_kill(enemy_kill), .e_x(enemy_x), .e_y(enemy_y),
         .p_kill(b_hit_player & player_alive),
         .p_x(player_x), .p_y(player_y),
@@ -298,12 +352,13 @@ module top #(
     end
 
     always @(posedge clock) begin
-        if (reset) begin
+        if (sys_rst) begin
             base_alive    <= 1'b1;
             lives         <= LIVES_START;
             score100      <= 4'd0;
             game_over     <= 1'b0;
             invuln_cnt    <= 28'd0;
+            invuln_q      <= 1'b0;
             respawn_pulse <= 1'b0;
         end else begin
             respawn_pulse <= 1'b0;              // 单拍脉冲
@@ -316,17 +371,34 @@ module top #(
             if (kill_any) score100 <= score100 + {2'b0, kill_pts};
 
             // 玩家中弹：扣命 -> 复活 + 无敌；最后一条命就 GAME OVER
+            //
+            // invuln_q 在这里和 invuln_cnt 一起更新 —— 它严格等于“下一拍的
+            // invuln_cnt 是不是非 0”，所以对外表现和 (invuln_cnt != 0) 逐拍相同：
+            //   · 扣命回场 / 换关回场：cnt 装一个大数  -> q = 1
+            //   · 倒计时路上（cnt > 1）：下一拍还剩 cnt-1 > 0 -> q = 1
+            //   · cnt 从 1 减到 0：q = 0（和旧版本同一拍变 0，不多保护一拍）
+            //   · 已经归零、没事件：q = 0
             if (b_hit_player && player_alive) begin
                 if (lives <= 2'd1) begin
                     lives     <= 2'd0;
                     game_over <= 1'b1;
+                    invuln_q  <= 1'b0;      // 命没了就不回场，无敌也没意义
                 end else begin
                     lives         <= lives - 2'd1;
                     invuln_cnt    <= INVULN_CYCLES;
+                    invuln_q      <= 1'b1;
                     respawn_pulse <= 1'b1;
                 end
+            end else if (lvl_respawn) begin
+                // 每关开局也送一段无敌：装载完的这一拍玩家刚被放回出生点，
+                // 要是正好有敌人蹲在出车口，没有保护就会被开局秒掉。
+                invuln_cnt <= INVULN_CYCLES;
+                invuln_q   <= 1'b1;
             end else if (invuln_cnt != 28'd0) begin
                 invuln_cnt <= invuln_cnt - 28'd1;
+                invuln_q   <= (invuln_cnt > 28'd1);
+            end else begin
+                invuln_q <= 1'b0;
             end
         end
     end
@@ -350,6 +422,7 @@ module top #(
         .SPAWN_CYCLES(SPAWN_CYCLES), .CLEAR_CYCLES(CLEAR_CYCLES)
     ) u_stage_ctrl (
         .clock(clock), .reset(reset),
+        .restart(restart_pulse),
         .game_over(game_over),
         .e_valid(enemy_valid), .load_done(lvl_load_done),
         .spawn(enemy_spawn), .spawn_type(enemy_spawn_type),
@@ -369,7 +442,9 @@ module top #(
     wire        ldr_busy;
 
     level_loader #(
-        .MAP_W(MAP_W), .HQ_X0(56), .HQ_Y0(112), .HQ_W(8), .HQ_H(6)
+        // 基地本体 = 4x4 格（鹰的 20x20 包围盒），和 map_generator.py 的
+        // HQ_X0/HQ_Y0/HQ_W/HQ_H 必须一模一样，否则换关后基地会错位。
+        .MAP_W(MAP_W), .HQ_X0(58), .HQ_Y0(113), .HQ_W(4), .HQ_H(4)
     ) u_level_loader (
         .clock(clock), .reset(reset),
         .start(lvl_load_start), .level(lvl_load_level),
@@ -388,6 +463,7 @@ module top #(
     vga #(.N_B(N_BULLET), .N_E(N_ENEMY), .N_FX(N_FX)) u_vga(
         .clock(clock), .reset(reset),
         .position_x(player_x), .position_y(player_y),
+        .player_hide(player_blink),
         .map_addr(vga_map_addr),
         .tile_id(vga_tile_id),
         .disp_RGB(disp_RGB), .hsync(hsync), .vsync(vsync),

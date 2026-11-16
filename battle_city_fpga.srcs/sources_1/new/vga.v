@@ -9,6 +9,8 @@ module vga #(
     input reset,
     input [9:0] position_x,       // 修复位宽
     input [9:0] position_y,
+    // 1 = 这一帧不画玩家坦克（复活无敌时的闪烁，见 top.v 的 player_blink）
+    input       player_hide,
     input wire [3:0] tile_id,
     input wire [1:0] player_direction,
     // 炮弹图层：每个槽 10 位坐标 + 2 位朝向，扁平打包（避免 unpacked array 端口）
@@ -99,6 +101,7 @@ module vga #(
     // 这里先打一拍：跨域只剩“FF -> FF”的走线，地址由 vga 域寄存器驱动。
     // 位置是准静态的，画面不会延迟（最多晚 1 个 vga_clk 看到新坐标，远小于 1 像素）。
     reg [9:0]          position_x_q, position_y_q;
+    reg                player_hide_q;
     reg [1:0]          player_direction_q;
     reg [N_E-1:0]      enemy_valid_q;
     reg [N_E*10-1:0]   enemy_x_q, enemy_y_q;
@@ -120,6 +123,7 @@ module vga #(
         img_y_d1           <= img_y;
         position_x_q       <= position_x;
         position_y_q       <= position_y;
+        player_hide_q      <= player_hide;
         player_direction_q <= player_direction;
         enemy_valid_q      <= enemy_valid;
         enemy_x_q          <= enemy_x;
@@ -191,7 +195,8 @@ module vga #(
     // 用无符号相减 + “< 20” 判断越界：img_x < position_x 时会回绕成很大的数。
     wire [10:0] pdx = img_x - position_x_q;
     wire [10:0] pdy = img_y - position_y_q;
-    wire        player_on   = (pdx < 11'd20) && (pdy < 11'd20);
+    // 无敌闪烁：player_hide 高的时候这一帧不画玩家（车身“亮/灭”闪）。
+    wire        player_on   = (pdx < 11'd20) && (pdy < 11'd20) && !player_hide_q;
     wire [8:0]  player_addr = tank_addr(pdx[4:0], pdy[4:0], player_direction_q);
 
     // 敌人坦克：同样的把式，每辆各算一遍（3 辆车 = 3 组比较器/小加法，很便宜）
@@ -373,14 +378,15 @@ module vga #(
                                                      : boom_ring_pixel;
 
     // ---------------- 基地（HQ）图层 ----------------
-    // map.coe 里的基地是 8x6 个格子（40x30 像素：x 280..319 / y 560..589），
-    // 而 headquarters.png 只有 20x20，所以把鹰居中画在这块区域中间：
-    //   x 290..309，y 565..584
+    // map.coe 里的基地本体是 4x4 个格子（20x20 像素：x 290..309 / y 565..584），
+    // 正好等于 headquarters.png 的精灵包围盒 —— tile_id == 5 的每一格都落在
+    // 下面这个 hq_on 窗口里，鹰占不到的格子是砖（1），画面因此不会出现
+    // “砖墙中间挖了个 40x30 黑坑、鹰孤零零坐在坑里”的观感。
     // 位置只影响画面，改地图时同步这两个常量即可（不参与任何碰撞/移动逻辑，
     // 基地占不占地由 terrain_probe 读 tile_id == 5 决定）。
     // 600x600 玩区之后基地整体左移 100px（原 390 -> 290）：
-    // 地图里的基地方块仍是 格 56..63 x 112..117（块 14..15 x 28..29），
-    // 精灵居中画在其中 40x30 的矩形里，所以占 格 58..61 x 113..116。
+    // 地图里的基地方块是 格 58..61 x 113..116（块 14~15 x 28~29 里的一部分，
+    // 同一个 'H' 块剩下的格子由 level_loader / map_generator 补成砖）。
     localparam [10:0] HQ_X0 = 11'd290,
                       HQ_Y0 = 11'd565;
 
@@ -392,7 +398,8 @@ module vga #(
                         + {4'b0, hq_dx[4:0]};
 
     // 两张基地贴图：完好（金鹰）和被打爆（白旗 + 断杆 + 碎石）。
-    // hq_destroyed 由 top 锁存（上电 0，被炮弹打中后永久 1，本工程没有重开一局），
+    // hq_destroyed 由 top 锁存（上电 0，被炮弹打中后置 1，GAME OVER 后按 BTNC
+    // 重开一局时随 sys_rst 清回 0 —— 所以 Eagle 会重新立起来），
     // 两张图用同一个地址，所以直接 mux 不会有一帧错位。
     // 它来自 sys 域，这里同样先打一拍再进 mux（准静态信号，晚 1 拍无影响）。
     reg hq_destroyed_q;

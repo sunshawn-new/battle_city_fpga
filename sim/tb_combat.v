@@ -6,6 +6,12 @@
 // 触发的办法是直接 force 炮弹系统的输出（b_hit_player / enemy_kill / enemy_valid /
 // b_base_hit）：等于让“炮弹打中了”这件事单拍发生，然后看 top 的状态怎么走。
 // 这样用例与地图、AI、时序全都解耦，改玩区/改 AI 都不用改这里。
+//
+// 用例编号：
+//   C01 复位初值        C02 挨打扣命 + 复活 + 无敌   C03 无敌期间免疫
+//   C04 命耗尽 GAME OVER C05 GAME OVER 后冻结        C06 基地被打爆
+//   C07 击杀分数        C08 STAGE CLEAR 横幅         C09 敌人爆炸位置
+//   C10 玩家爆炸位置    C11 无敌期间闪烁（player_hide）
 // ============================================================================
 module tb_combat;
     localparam MOVE_DIV      = 200;
@@ -40,11 +46,18 @@ module tb_combat;
     integer k, j;
 
     task do_reset;
+        integer n;
         begin
             reset = 1'b1;
             btn_up = 0; btn_down = 0; btn_left = 0; btn_right = 0;
             repeat (10) @(posedge clock);
             reset = 1'b0;
+            // 复位后 stage_ctrl 会把第 1 关地图重新写进 BRAM（约 15k 拍），
+            // 期间 paused=1、全场冻结。等它装完再往下跑，否则后面的移动用例全动不了。
+            n = 0;
+            while (u_top.stage_paused && n < 200000) begin
+                @(posedge clock); n = n + 1;
+            end
             repeat (100) @(posedge clock);
         end
     endtask
@@ -123,18 +136,18 @@ module tb_combat;
         check_int("C01a lives start at 3", u_top.lives, 3);
         check_int("C01b score starts at 0", u_top.score100, 0);
         check_int("C01c not game over",     u_top.game_over, 0);
-        check_pos("C01d player at spawn", 10'd300, 10'd300);
+        check_pos("C01d player at spawn", 10'd200, 10'd560);
 
         // ---------------- C02 挨一发：扣命 + 复活回出生点 + 进入无敌 ----------------
         btn_right = 1'b1;
         repeat (MOVE_DIV * 3) @(posedge clock);     // 走 3 格
         btn_right = 1'b0;
         repeat (10) @(posedge clock);
-        check_pos("C02a moved away from spawn", 10'd315, 10'd300);
+        check_pos("C02a moved away from spawn", 10'd215, 10'd560);
 
         player_hit;
         check_int("C02b lives 3 -> 2", u_top.lives, 2);
-        check_pos("C02c respawn at centre", 10'd300, 10'd300);
+        check_pos("C02c respawn at spawn", 10'd200, 10'd560);
         if (u_top.player_invuln !== 1'b1) begin
             errors = errors + 1;
             $display("[FAIL] C02d no invulnerability after respawn");
@@ -209,8 +222,8 @@ module tb_combat;
         release u_top.enemy_terrain_valid;
 
         // ---------------- C10 玩家中弹 -> 爆炸落在死亡位置（不是出生点）----------------
-        // 这条用例守的是 fx_ctrl 的采样时机：玩家挨打后下一拍就被 respawn 拉回 (300,300)，
-        // 如果爆炸的坐标晚一拍采样，就会跑回画面正中。
+        // 这条用例守的是 fx_ctrl 的采样时机：玩家挨打后下一拍就被 respawn 拉回出生点 (200,560)，
+        // 如果爆炸的坐标晚一拍采样，就会跑回出生点。
         do_reset;
         btn_right = 1'b1;
         repeat (MOVE_DIV * 3) @(posedge clock);
@@ -218,9 +231,38 @@ module tb_combat;
         repeat (10) @(posedge clock);
         player_hit;
         check_int("C10a lives 3 -> 2",            u_top.lives,    2);
-        check_int("C10b respawn back to centre",  u_top.player_x, 10'd300);
-        check_int("C10c explosion x = death pos", u_top.fx_x[3*10 +: 10], 10'd315);
-        check_int("C10d explosion y = death pos", u_top.fx_y[3*10 +: 10], 10'd300);
+        check_int("C10b respawn back to spawn",   u_top.player_x, 10'd200);
+        check_int("C10c explosion x = death pos", u_top.fx_x[3*10 +: 10], 10'd215);
+        check_int("C10d explosion y = death pos", u_top.fx_y[3*10 +: 10], 10'd560);
+
+        // ---------------- C11 无敌期间车身闪烁（player_hide）----------------
+        // top.v 里 player_blink = player_invuln & blink_cnt[22]，
+        // vga.v 用 player_hide_q 把玩家坦克藏起来 —— 玩家一眼就能看出“现在打不中我”。
+        // blink_cnt 在板上一拍 10ns、2^22 拍 ≈ 42ms，仿真里等不到那么久，直接 force 它。
+        // 注意：xsim 不允许对 reg 的位选 force（VRFC 10-3149），所以整根 23 位一起写，
+        // 让第 22 位当“亮/灭”开关。
+        do_reset;
+        player_hit;                                     // 扣一条命 -> 进入无敌
+        if (u_top.player_invuln !== 1'b1) begin
+            errors = errors + 1;
+            $display("[FAIL] C11a not invulnerable, cannot test the blink");
+        end else begin
+            $display("[ OK ] C11a invulnerable after respawn");
+        end
+        force u_top.blink_cnt = 23'h400000;             // bit22 = 1 -> 灭
+        repeat (2) @(posedge clock);
+        check_int("C11b blink phase = hide", u_top.player_blink, 1);
+        check_int("C11c vga hides the tank", u_top.u_vga.player_hide_q, 1);
+        force u_top.blink_cnt = 23'h000000;             // bit22 = 0 -> 亮
+        repeat (2) @(posedge clock);
+        check_int("C11d blink phase = show", u_top.player_blink, 0);
+        check_int("C11e vga draws the tank", u_top.u_vga.player_hide_q, 0);
+        // 无敌结束后，即使日志位是 1 也不能再藏（否则复活保护结束后车会半透明）
+        repeat (INVULN_CYCLES + 10) @(posedge clock);
+        force u_top.blink_cnt = 23'h400000;
+        repeat (2) @(posedge clock);
+        check_int("C11f no hide after invuln ends", u_top.player_blink, 0);
+        release u_top.blink_cnt;
 
         $display("==============================================");
         if (errors == 0) $display("ALL TESTS PASSED");

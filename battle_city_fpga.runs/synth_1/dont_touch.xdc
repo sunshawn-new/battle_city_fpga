@@ -21,6 +21,9 @@ set_property KEEP_HIERARCHY SOFT [get_cells -hier -filter {REF_NAME==blk_mem_riv
 # IP: ip/blk_mem_brick/blk_mem_brick.xci
 set_property KEEP_HIERARCHY SOFT [get_cells -hier -filter {REF_NAME==blk_mem_brick || ORIG_REF_NAME==blk_mem_brick} -quiet] -quiet
 
+# IP: ip/blk_mem_level_2/blk_mem_level.xci
+set_property KEEP_HIERARCHY SOFT [get_cells -hier -filter {REF_NAME==blk_mem_level || ORIG_REF_NAME==blk_mem_level} -quiet] -quiet
+
 # XDC: e:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.gen/sources_1/ip/blk_mem_gen_0/blk_mem_gen_0_ooc.xdc
 
 # XDC: e:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.gen/sources_1/ip/blk_mem_player_tank/blk_mem_player_tank_ooc.xdc

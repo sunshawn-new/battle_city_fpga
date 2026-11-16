@@ -16,8 +16,9 @@ open_project "$root/battle_city_fpga.xpr"
 # ---- 新增的 RTL 源文件（HUD 相关）：工程里没有就加进去 ----
 # 幂等：重复运行不会重复添加。hud.v / font5x7.v 是 600x600 + 侧栏那一版加的，
 # 老工程文件（.xpr）里没有它们，综合会报 "module 'hud' not found"。
+# tank_block.v 是“坦克互斥”那一版加的，同理（sim/add_tank_block.tcl 也是干这件事）。
 set src_dir "$root/battle_city_fpga.srcs/sources_1/new"
-foreach f {hud.v font5x7.v fx_ctrl.v stage_ctrl.v level_loader.v} {
+foreach f {hud.v font5x7.v fx_ctrl.v stage_ctrl.v level_loader.v tank_block.v} {
     set p "$src_dir/$f"
     if {[llength [get_files -quiet $p]] == 0} {
         puts "=== add source: $f ==="
@@ -124,8 +125,21 @@ foreach ip [get_ips -quiet] {
         continue
     }
     if {![file exists $stale_dcp] || ([file mtime $coe_abs] > [file mtime $stale_dcp])} {
-        puts "=== OOC stale: $stale_run (coe newer than dcp) -> reset_run ==="
+        puts "=== OOC stale: $stale_run (coe newer than dcp) -> reset + resynth ==="
         reset_run $stale_run
+        # 这里必须当场把它综合掉：下面那个循环只看 PROGRESS，而 reset_run 之后
+        # PROGRESS 有可能还报 100%（缓存），于是一路跑到最后的“dcp 太旧”检查才
+        # 报错退出（2026-11-15 第十轮就踩过一次）。
+        launch_runs $stale_run -jobs 8
+        wait_on_run $stale_run
+        if {[get_property PROGRESS [get_runs $stale_run]] ne "100%"} {
+            error "OOC synthesis FAILED: $stale_run"
+        }
+        set dcp_now "$root/battle_city_fpga.runs/$stale_run/$n.dcp"
+        if {[file exists $dcp_now] && [llength [get_files -quiet $dcp_now]] == 0} {
+            puts "=== re-attach $n.dcp to sources_1 ==="
+            add_files -norecurse -fileset sources_1 $dcp_now
+        }
     }
 }
 

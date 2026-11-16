@@ -84,6 +84,17 @@ module terrain_probe #(
     // 位置或朝向变了，之前的结果就作废，需要重新查
     wire query_changed = (x != snap_x) || (y != snap_y) || (dir != snap_dir);
 
+    // 前进方向已经贴着玩区边缘：那一行/列根本不存在，按“挡住”处理。
+    // 不这么做的话下面的 g_front_up/g_front_down/... 会把越界的行列夹回车身
+    // 自己身上，探针于是报“空地”，而坦克的移动又会被 y/x 的边界判断拦住 ——
+    // 表现是敌人选了“上”、发现一步也走不动、stuck 还清零，最后钉在顶边朝上。
+    // （敌人出生点就在 y=0，这条路径在正常游戏里一定会被走到。）
+    wire edge_blocked =
+        (snap_dir == 2'b00) && (snap_y == 10'd0) ||
+        (snap_dir == 2'b01) && (snap_y + TANK_H >= MAP_H * TILE) ||
+        (snap_dir == 2'b10) && (snap_x == 10'd0) ||
+        (snap_dir == 2'b11) && (snap_x + TANK_W >= MAP_W * TILE);
+
     assign terrain = front_terrain;
     // 只有“查询完成”且“查询条件就是当前的位置/朝向”时，结果才可信
     assign valid   = front_valid && !query_changed;
@@ -205,7 +216,8 @@ module terrain_probe #(
                     scan_phase <= scan_phase + 3'd1;   // 地址保持 5 拍，等 BRAM 读稳
                 end else if (scan_cell == 3'd4) begin
                     // 5 个格子查完（第 5 格可能和第 4 格重复，读到同一个值无害）
-                    front_terrain <= merge_terrain(scan_worst, map_dout);
+                    front_terrain <= edge_blocked ? T_BRICK
+                                                  : merge_terrain(scan_worst, map_dout);
                     front_valid   <= 1'b1;
                     scan_state    <= S_IDLE;
                     scan_phase    <= 3'd0;

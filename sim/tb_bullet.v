@@ -431,12 +431,14 @@ module tb_bullet;
         check_mask   ("B05a steel kills bullet", 4'b0000);
         check_terrain("B05b steel not destroyed", CELL_UP1, 4'd2);
 
-        // ---------------- B06 河流：消失，地图不变 ----------------
+        // ---------------- B06 河流：炮弹飞过去（水只挡坦克），地图不变 ----
+        // 原版规则就是"河挡车不挡弹"，隔河对射是这张图最经典的攻防；
+        // 早期版本把河当成钢墙，结果两岸的车谁也打不到谁，很别扭。
         do_reset;
         tank_x = 10'd300; tank_y = 10'd300; tank_dir = 2'b00;
         poke(CELL_UP1, 4'd3);
         fire; wait_cycles(90);
-        check_mask   ("B06a river kills bullet", 4'b0000);
+        check_mask   ("B06a river does not stop bullet", 4'b0001);
         check_terrain("B06b river not destroyed", CELL_UP1, 4'd3);
 
         // ---------------- B07 树林：可以穿过去 ----------------

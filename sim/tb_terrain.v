@@ -17,9 +17,12 @@
 //
 // 【几何常量】600x600 玩区 = 120x120 格；改玩区尺寸时只需要改这一小段
 // 地图契约（map_generator.py 校验的同一套）：
-//   基地本体 : 列 56~63 x 行 112~117（vga.v 的 HQ_X0/HQ_Y0 = 290/565）
-//   玩家出生 : (300,300) 格 (60,60)，上下各 60px 通道必须空
-//   敌人出生 : (40,10)/(300,10)/(560,10) 及其正下方 20px 必须空
+//       基地本体 : 列 58~61 x 行 113~116（= vga.v 里 20x20 金鹰精灵的包围盒，
+//                  HQ_X0/HQ_Y0 = 290/565；H 块其余格子由展开器补成砖，
+//                  所以砖墙是紧贴着基地的）
+//   玩家出生 : (200,560) 格 (40,112) —— 基地左边一块、贴着底边（原版 1P 位置）
+//              车身上下 ±60px（下方到画面底边为止）和往右到堡垒墙的横走廊必须空
+//   敌人出生 : (40,0)/(300,0)/(560,0) 及其正下方 20px 必须空
 //
 // 仿真用 MOVE_DIV=200 代替板上的 4_000_000。坦克是【整格移动】：每个
 // move_tick 走一整格 TILE=5 像素（见 player.v 的说明），地形扫描约 22 拍，
@@ -30,16 +33,20 @@ module tb_terrain;
 
     // ---------------- 几何常量（和 top.v / map_generator.py 保持一致）----------
     localparam MAP_W   = 120;          // 地图宽（格）
-    localparam SPAWN_X = 300;          // 玩家出生点（像素）
-    localparam SPAWN_Y = 300;
-    localparam HQ_CX   = 56;           // 基地矩形左上角（格）
-    localparam HQ_CY   = 112;
-    localparam HQ_W    = 8;            // 8x6 格 = 40x30 像素
-    localparam HQ_H    = 6;
+    localparam SPAWN_X = 200;          // 玩家出生点（像素）= player.v 的 SPAWN_X/Y
+    localparam SPAWN_Y = 560;          //   基地左边一块、贴着底边（块 10 x 28）
+    // 下面那批“清空地图再摆砖”的碰撞用例不依赖出生点，统一把坦克摆到画面中心
+    // 来摆形状（对应 poke 里的行 59 / 列 60 这些地址）。
+    localparam COMB_X  = 300;
+    localparam COMB_Y  = 300;
+    localparam HQ_CX   = 58;           // 基地本体左上角（格）= 鹰的 20x20 包围盒
+    localparam HQ_CY   = 113;
+    localparam HQ_W    = 4;            // 4x4 格 = 20x20 像素（vga.v 的 HQ_X0/HQ_Y0 = 290/565）
+    localparam HQ_H    = 4;
     localparam ENEMY_X0 = 40;          // 三个敌人出生点（像素）
     localparam ENEMY_X1 = 300;
     localparam ENEMY_X2 = 560;
-    localparam ENEMY_Y  = 10;
+    localparam ENEMY_Y  = 0;           // 贴最上面一行（块行 0）
 
     // 格地址 = row*MAP_W + col（和 RTL 里 (row<<7)-(row<<3)+col 一致）
     function [14:0] A;
@@ -94,11 +101,18 @@ module tb_terrain;
     endtask
 
     task do_reset;
+        integer n;
         begin
             reset = 1'b1;
             btn_up = 0; btn_down = 0; btn_left = 0; btn_right = 0;
             repeat (10) @(posedge clock);
             reset = 1'b0;
+            // 复位后 stage_ctrl 会把第 1 关地图重新写进 BRAM（约 15k 拍），
+            // 期间 paused=1、玩家被冻结。等它装完再往下跑。
+            n = 0;
+            while (u_top.stage_paused && n < 200000) begin
+                @(posedge clock); n = n + 1;
+            end
             repeat (80) @(posedge clock);   // 等前方地形扫描完成（约 22 拍）
         end
     endtask
@@ -188,12 +202,13 @@ module tb_terrain;
                      u_top.player_terrain_in_front);
         end
 
-        // ---- T15：真地图契约 —— 基地本体必须正好是 列 56~63 x 行 112~117 ----
-        // vga.v 画基地精灵用的是 HQ_X0/HQ_Y0 = 290/565（精灵 20x20 居中在
-        // 40x30 的方块里），map_generator.py 则把 tile 5 铺在 56~63 x 112~117。
-        // 两者一旦错开，板上就会变成“鹰画在空地上”或者“炮弹打不掉基地”。
+        // ---- T15：真地图契约 —— 基地本体必须正好是 列 58~61 x 行 113~116 ----
+        // vga.v 画基地精灵用的是 HQ_X0/HQ_Y0 = 290/565（20x20 精灵 = 4x4 格），
+        // map_generator.py 就必须把 tile 5 铺在同一块 4x4 格上 —— 两者严丝合缝，
+        // 鹰占不到的格子才有砖补上（不会有"砖墙中间挖个黑坑"）。
+        // 一旦错开，板上就会变成"鹰画在砖墙上"或者"炮弹打不掉基地"。
         begin : hq_contract
-            integer hx, hy, hq_bad, stray_bad;
+            integer hx, hy, hq_bad, stray_bad, shell_bad;
             begin
                 hq_bad = 0;
                 for (hy = HQ_CY; hy < HQ_CY + HQ_H; hy = hy + 1)
@@ -201,9 +216,9 @@ module tb_terrain;
                         if (u_top.u_map_ram.mem[A(hx, hy)] !== 4'd5) hq_bad = hq_bad + 1;
                 if (hq_bad != 0) begin
                     errors = errors + 1;
-                    $display("[FAIL] T15a HQ body: %0d/48 cells are not tile 5", hq_bad);
+                    $display("[FAIL] T15a HQ body: %0d/16 cells are not tile 5", hq_bad);
                 end else
-                    $display("[ OK ] T15a HQ body 8x6 @ cell(%0d,%0d) is all tile 5",
+                    $display("[ OK ] T15a HQ body 4x4 @ cell(%0d,%0d) is all tile 5",
                              HQ_CX, HQ_CY);
 
                 stray_bad = 0;
@@ -218,28 +233,58 @@ module tb_terrain;
                     $display("[FAIL] T15b %0d stray tile-5 cells outside HQ box", stray_bad);
                 end else
                     $display("[ OK ] T15b no tile 5 outside the HQ box");
+
+                // T15c：基地上下左右各 1 格必须是砖/钢 —— "砖块把基地围起来"。
+                // 这就是地图生成时 map_generator.validate() 的第 1b 条，在 RTL 侧
+                // 再验一遍：只要外墙漏一格，坦克就能贴着基地开炮。
+                shell_bad = 0;
+                for (hx = HQ_CX - 1; hx <= HQ_CX + HQ_W; hx = hx + 1) begin
+                    if (u_top.u_map_ram.mem[A(hx, HQ_CY - 1)] !== 4'd1 &&
+                        u_top.u_map_ram.mem[A(hx, HQ_CY - 1)] !== 4'd2) shell_bad = shell_bad + 1;
+                    if (u_top.u_map_ram.mem[A(hx, HQ_CY + HQ_H)] !== 4'd1 &&
+                        u_top.u_map_ram.mem[A(hx, HQ_CY + HQ_H)] !== 4'd2) shell_bad = shell_bad + 1;
+                end
+                for (hy = HQ_CY; hy < HQ_CY + HQ_H; hy = hy + 1) begin
+                    if (u_top.u_map_ram.mem[A(HQ_CX - 1, hy)] !== 4'd1 &&
+                        u_top.u_map_ram.mem[A(HQ_CX - 1, hy)] !== 4'd2) shell_bad = shell_bad + 1;
+                    if (u_top.u_map_ram.mem[A(HQ_CX + HQ_W, hy)] !== 4'd1 &&
+                        u_top.u_map_ram.mem[A(HQ_CX + HQ_W, hy)] !== 4'd2) shell_bad = shell_bad + 1;
+                end
+                if (shell_bad != 0) begin
+                    errors = errors + 1;
+                    $display("[FAIL] T15c %0d HQ shell cells are not brick/steel", shell_bad);
+                end else
+                    $display("[ OK ] T15c HQ shell is brick on all four sides");
             end
         end
 
-        // ---- T16：出生点净空（玩家上下 60px 通道 + 三个敌人出生点正下方）----
+        // ---- T16：出生点净空（玩家 ±60px 通道 + 三个敌人出生点正下方）----
         // 可通行 = tile 0（空地）或 4（树林）；砖 1 / 钢 2 / 河 3 / 基地 5 都算挡住
         begin : spawn_contract
             integer sx, sy, bad;
             begin
+                // 玩家出生点 (200,560) = 格列 40~43 x 格行 112~115。
+                // 竖直方向 ±60px：往上是 100 行，往下会越出画面，所以只检查 100~119
+                // （和 map_generator.validate() 里 clip=True 的那条一致）。
                 bad = 0;
-                for (sy = 48; sy <= 72; sy = sy + 1)
-                    for (sx = 56; sx <= 67; sx = sx + 1)
+                for (sy = 100; sy <= 119; sy = sy + 1)
+                    for (sx = 40; sx <= 43; sx = sx + 1)
+                        if (!(u_top.u_map_ram.mem[A(sx, sy)] == 4'd0 ||
+                              u_top.u_map_ram.mem[A(sx, sy)] == 4'd4)) bad = bad + 1;
+                // 横向：出生点到堡垒左墙（块列 13，= 格列 52）之间必须能开过去
+                for (sy = 112; sy <= 115; sy = sy + 1)
+                    for (sx = 40; sx <= 51; sx = sx + 1)
                         if (!(u_top.u_map_ram.mem[A(sx, sy)] == 4'd0 ||
                               u_top.u_map_ram.mem[A(sx, sy)] == 4'd4)) bad = bad + 1;
                 if (bad != 0) begin
                     errors = errors + 1;
                     $display("[FAIL] T16a player spawn corridor: %0d blocked cells", bad);
                 end else
-                    $display("[ OK ] T16a player spawn (%0d,%0d) +/-60px corridor is clear",
+                    $display("[ OK ] T16a player spawn (%0d,%0d) corridor is clear",
                              SPAWN_X, SPAWN_Y);
 
                 bad = 0;
-                for (sy = 2; sy <= 9; sy = sy + 1) begin
+                for (sy = 0; sy <= 9; sy = sy + 1) begin
                     for (sx = ENEMY_X0/5; sx <= ENEMY_X0/5 + 3; sx = sx + 1)
                         if (!(u_top.u_map_ram.mem[A(sx, sy)] == 4'd0 ||
                               u_top.u_map_ram.mem[A(sx, sy)] == 4'd4)) bad = bad + 1;
@@ -260,7 +305,7 @@ module tb_terrain;
         end
 
         // ---- 出生点四方向：这就是“空气墙”bug 的回归测试 ----
-        do_reset;                                  // 出生点 (300,300)
+        do_reset;                                  // 出生点 (200,560)
         btn_up = 1'b1;    step_ticks(10); btn_up = 1'b0;
         check_pos("T01 spawn -> up (was stuck)", SPAWN_X, SPAWN_Y - 10);
 
@@ -299,54 +344,54 @@ module tb_terrain;
         check_pos("T13 down blocked by base roof", 10'd300, 10'd500);
 
         // ================= 以下用例先把地图清零，只测碰撞逻辑 =================
-        // poke 的地址 = A(列, 行)。坦克出生在 (300,300) 时：
+        // poke 的地址 = A(列, 行)。这些用例不测出生点，统一把坦克摆到 (300,300)：
         //   上边缘 = 行 60（所以“正前方”是行 59），左边缘 = 列 60
-        // 这样用例和关卡文件内容完全解耦：改地图不需要改测试台。
+        // 这样用例和关卡文件内容、和出生点位置都完全解耦。
 
         // ---- T08：砖块切角 —— 正前方 4 格只有最左一格是砖，也必须挡住 ----
-        do_reset; clear_map; wait_refresh;
+        do_reset; clear_map; wait_refresh; place_tank(COMB_X, COMB_Y);
         poke(A(60, 59), 4'd1);
         wait_refresh;
         btn_up = 1'b1;    step_ticks(5); btn_up = 1'b0;
-        check_pos("T08 up blocked by 1 brick cell", SPAWN_X, SPAWN_Y);
+        check_pos("T08 up blocked by 1 brick cell", COMB_X, COMB_Y);
 
         // ---- T09：河流挡住；把河擦掉就能走 ----
-        do_reset; clear_map; wait_refresh;
+        do_reset; clear_map; wait_refresh; place_tank(COMB_X, COMB_Y);
         for (j = 60; j <= 63; j = j + 1) poke(A(j[7:0], 59), 4'd3);
         wait_refresh;
         btn_up = 1'b1;    step_ticks(5); btn_up = 1'b0;
-        check_pos("T09a river blocks", SPAWN_X, SPAWN_Y);
+        check_pos("T09a river blocks", COMB_X, COMB_Y);
 
         for (j = 60; j <= 63; j = j + 1) poke(A(j[7:0], 59), 4'd0);
         wait_refresh;
         btn_up = 1'b1;    step_ticks(5); btn_up = 1'b0;
-        check_pos("T09b river removed -> moves", SPAWN_X, SPAWN_Y - 5);
+        check_pos("T09b river removed -> moves", COMB_X, COMB_Y - 5);
 
         // ---- T10：树林可以通行 ----
-        do_reset; clear_map; wait_refresh;
+        do_reset; clear_map; wait_refresh; place_tank(COMB_X, COMB_Y);
         for (j = 60; j <= 63; j = j + 1) poke(A(j[7:0], 59), 4'd4);
         wait_refresh;
         btn_up = 1'b1;    step_ticks(5); btn_up = 1'b0;
-        check_pos("T10 up into woods (passable)", SPAWN_X, SPAWN_Y - 5);
+        check_pos("T10 up into woods (passable)", COMB_X, COMB_Y - 5);
 
         // ---- T11：钢板挡住；擦掉后能走 ----
-        do_reset; clear_map; wait_refresh;
+        do_reset; clear_map; wait_refresh; place_tank(COMB_X, COMB_Y);
         for (j = 60; j <= 63; j = j + 1) poke(A(j[7:0], 59), 4'd2);
         wait_refresh;
         btn_up = 1'b1;    step_ticks(5); btn_up = 1'b0;
-        check_pos("T11a steel injected blocks", SPAWN_X, SPAWN_Y);
+        check_pos("T11a steel injected blocks", COMB_X, COMB_Y);
 
         for (j = 60; j <= 63; j = j + 1) poke(A(j[7:0], 59), 4'd0);
         wait_refresh;
         btn_up = 1'b1;    step_ticks(5); btn_up = 1'b0;
-        check_pos("T11b steel removed -> moves", SPAWN_X, SPAWN_Y - 5);
+        check_pos("T11b steel removed -> moves", COMB_X, COMB_Y - 5);
 
         // ---- T12：向左撞砖块（左前方是列 59，坦克占行 60~63）----
-        do_reset; clear_map; wait_refresh;
+        do_reset; clear_map; wait_refresh; place_tank(COMB_X, COMB_Y);
         for (j = 60; j <= 63; j = j + 1) poke(A(59, j[7:0]), 4'd1);
         wait_refresh;
         btn_left = 1'b1;  step_ticks(5); btn_left = 1'b0;
-        check_pos("T12 left blocked by brick", SPAWN_X, SPAWN_Y);
+        check_pos("T12 left blocked by brick", COMB_X, COMB_Y);
 
         // ---- T14 格点不变量：坐标必须永远是 TILE(5) 的倍数 ----
         // 这是炮弹系统（bullet-ctrl.v）按格判定的前提：坦克一旦停在非格点上，

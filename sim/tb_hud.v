@@ -16,7 +16,7 @@
 //   H05~H07 标题 / 关卡 / 标签确实画出了字形（数“文字色”像素 > 阈值）
 //   H08/H09 分数、生命是数字字形，随状态变化
 //   H10 敌人图标的位置/兵种跟着 enemy_valid 走
-//   H11/H12 GAME OVER 横幅只在 game_over 时出现
+//   H11/H12 GAME OVER 横幅（含下面那行 "PRESS BTNC" 重开提示）
 // ============================================================================
 module tb_hud;
     localparam MOVE_DIV = 200;
@@ -222,6 +222,9 @@ module tb_hud;
         // 没输的时候 banner 区域不该有白色文字
         count_color(628, 771, 300, 313, 12'hFFF, prev);
         check_int("H11 no banner before game over", prev, 0);
+        // 也没输的时候 y=322 那行不该被当成文字行（li=15 = 不是文字）
+        probe(620, 322);
+        check_int("H11g no hint row before game over", u_top.u_vga.u_hud.li, 15);
 
         force u_top.game_over = 1'b1;
         repeat (4) @(posedge clock);
@@ -229,6 +232,14 @@ module tb_hud;
         check_int("H11b banner row is a text row", u_top.u_vga.u_hud.li, 8);
         count_color(628, 771, 300, 313, 12'hFFF, cnt);
         check_ge("H11c GAME OVER text drawn", cnt, 100);
+
+        // GAME OVER 下面那行“按 BTNC 重开”（hud.v 的 li=10 行，x0+20, y=322）。
+        // tb 里 blink_cnt 被钉成 0 -> blink=0 -> 文字是暗色 12'h888。
+        // 这是重开一局在板子上唯一的入口，缺了它 GAME OVER 就没法退出。
+        probe(620, 322);
+        check_int("H11e restart hint is a text row", u_top.u_vga.u_hud.li, 10);
+        count_color(620, 795, 322, 335, 12'h888, cnt);
+        check_ge("H11f PRESS BTNC drawn", cnt, 60);
 
         // release 之后 game_over 会停在 force 的那个值（过程赋值没再出现），
         // 所以这里要复位一次把它清掉，否则下面的 VICTORY 永远被 GAME OVER 压着。

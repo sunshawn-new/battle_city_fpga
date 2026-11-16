@@ -13,6 +13,9 @@
 //    · 本关打完（队列空 && 场上没人）-> STAGE CLEAR 横幅 CLEAR_CYCLES（2s）
 //      -> 装载下一关地图 -> 玩家回出生点、敌人重新排一屏 -> 继续；
 //    · 打完最后一关回到第 1 关（无限循环，分数/生命不清零）。
+//    · 重开一局（reset 或 restart）：状态机直接推到 S_LOAD，重新装载第 1 关地图。
+//      必须重装地图 —— BRAM 里留着上一局打掉的砖墙 / 上一关的布局，光把
+//      level 拨回 1 会让"HUD 说第 1 关、画面还是第 3 关"这种错位。
 //
 //  【为什么不放在 top.v 里】
 //    top 已经在管地图总线、生命/分数、VGA 接线；关卡流程是一个完整的小状态机
@@ -32,6 +35,7 @@ module stage_ctrl #(
 )(
     input             clock,
     input             reset,
+    input             restart,          // 单拍：重开一局（GAME OVER 后按 BTNC，见 top.v）
     input             game_over,        // 1 = 本局结束：不再刷新敌人
 
     input [N_E-1:0]   e_valid,          // 敌人槽占用情况（来自 enemy_ctrl）
@@ -129,15 +133,21 @@ module stage_ctrl #(
                       (remaining == 6'd0) && (slot_busy == {N_E{1'b0}});
 
     always @(posedge clock) begin
-        if (reset) begin
-            state       <= S_PLAY;
+        if (reset || restart) begin
+            // 上电 / 板上复位键 / GAME OVER 后重开，全都走这里：
+            // 直接把状态推到 S_LOAD，让 level_loader 把第 1 关地图重新写一遍。
+            //   · 冷启动时 BRAM 里本来就是第 1 关（blk_mem_gen_0 的 coe 初值），
+            //     重写一次只是白花 162us，换来的是“任何入口都从同一状态开始”；
+            //   · 关键点是 SEARCH/复位键在关卡中途被按下的情况：BRAM 里留着第 n 关
+            //     的砖墙，如果不清掉就和 level=1 的敌人波次对不上（以前就是这里错位）。
+            state       <= S_LOAD;
             remaining   <= ENEMIES_PER_STAGE[5:0];
             idx         <= 6'd0;
             spawn       <= {N_E{1'b0}};
             spawn_type  <= {N_E*2{1'b0}};
             level       <= 3'd1;
             stage_clear <= 1'b0;
-            load_start  <= 1'b0;
+            load_start  <= 1'b1;            // 下一拍装载（脉冲，else 分支会清掉）
             load_level  <= 3'd1;
             respawn     <= 1'b0;
             spawn_timer <= 32'd0;

@@ -1,0 +1,4 @@
+INFO: [VRFC 10-2263] Analyzing Verilog file "e:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.srcs/sources_1/new/player.v" into library work
+INFO: [VRFC 10-311] analyzing module player
+INFO: [VRFC 10-2263] Analyzing Verilog file "e:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.srcs/sources_1/new/enemy_ctrl.v" into library work
+INFO: [VRFC 10-311] analyzing module enemy_ctrl

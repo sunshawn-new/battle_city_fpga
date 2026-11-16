@@ -31,7 +31,10 @@
 //     那一个像素所在的格。原来的写法只测 1 格，弹体侧面压着砖、中心线却从
 //     缺口/缝里过去时，子弹就整条穿过去了（板子上表现为“炮弹穿墙”）。
 //        · 砖墙(1)        -> 炮弹消失，并把这 4 格按坦克宽度扩成 4x2 的洞全清掉
-//        · 钢/河(2,3)     -> 炮弹消失（不改地图）
+//        · 钢墙(2)        -> 炮弹消失（不改地图）
+//        · 河流(3)        -> 穿过去！水面只挡坦克，不挡炮弹（原版就是这么定的：
+//                            隔河对射是这张图最经典的攻防；早期版本把河当成墙，
+//                            结果两边的坦克谁也打不到谁，很别扭）
 //        · 基地(5)        -> 炮弹消失，并发一个单拍 base_hit 给 top：top 锁存
 //                            game-over，VGA 把基地换成“白旗”贴图。地图格仍是 5，
 //                            所以基地那块地方永远进不去。
@@ -626,13 +629,16 @@ module bullet_ctrl #(
                         kill_slot  <= chk_idx;
                         base_hit   <= 1'b1;
                         chk_state  <= C_NEXT;
-                    end else if (map_dout != T_EMPTY && map_dout != T_WOODS) begin
-                        // 钢墙 / 河流：炮弹消失，地图不变
+                    end else if (map_dout != T_EMPTY && map_dout != T_WOODS &&
+                                 map_dout != T_RIVER) begin
+                        // 钢墙：炮弹消失，地图不变。
+                        // 河流（T_RIVER）不在这里 —— 水只挡坦克不挡炮弹，
+                        // 所以它和空地/树林一样走下面那条“穿过去”的分支。
                         kill_pulse <= 1'b1;
                         kill_slot  <= chk_idx;
                         chk_state  <= C_NEXT;
                     end else if (box_i == 2'd3) begin
-                        // 2x2 全是空地/树林：记下这一组格子，下次弹体没换格就跳过
+                        // 2x2 全是空地/树林/水面：记下这一组格子，下次弹体没换格就跳过
                         mark_pulse <= 1'b1;
                         mark_idx   <= chk_idx;
                         mark_cell  <= {box_cx, box_cy};

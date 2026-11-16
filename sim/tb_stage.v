@@ -21,6 +21,7 @@
 //   S06 新关开局：玩家回出生点、3 辆敌人重新排一屏、队列重新计数
 //   S07 GAME OVER 之后不再补车
 //   S08 打完最后一关回到第 1 关（地图又变回第 1 关）
+//   S09 GAME OVER 后按 BTNC 重开：生命/分数/基地清零、地图重装、玩家回出生点
 // ============================================================================
 module tb_stage;
     localparam MOVE_DIV     = 200;
@@ -69,11 +70,19 @@ module tb_stage;
     integer k, j;
 
     task do_reset;
+        integer n;
         begin
             reset = 1'b1;
             btn_up = 0; btn_down = 0; btn_left = 0; btn_right = 0;
             repeat (10) @(posedge clock);
             reset = 1'b0;
+            // 复位后先把第 1 关地图重新写进 BRAM（约 15k 拍，paused=1 全场冻结）。
+            // 等装载完再数 200 拍：这段时间刚好够 3 辆车各派出去、probe 扫一遍，
+            // 但不到一个敌人移动节拍（MOVE_DIV*2 = 400），所以坐标还在出生点。
+            n = 0;
+            while (u_top.stage_paused && n < 200000) begin
+                @(posedge clock); n = n + 1;
+            end
             repeat (200) @(posedge clock);   // 3 辆入场 + 4 个 probe 各扫一遍
         end
     endtask
@@ -106,6 +115,31 @@ module tb_stage;
             release u_top.enemy_hit[0];
             release u_top.enemy_hit[1];
             release u_top.enemy_hit[2];
+            repeat (3) @(posedge clock);
+        end
+    endtask
+
+    // 等地图装载结束（paused 落回 0）：900 块 x 18 拍 ≈ 16200 拍。
+    // 装载期间全场冻结，不等它就去测移动/坐标会全部读到“还没动”的状态。
+    task wait_load;
+        integer n;
+        begin
+            n = 0;
+            while (u_top.stage_paused && n < 200000) begin
+                @(posedge clock);
+                n = n + 1;
+            end
+        end
+    endtask
+
+    // 给玩家一个单拍“被打中”脉冲（绕开炮弹，和 hit_enemy 一样直接捅 top 里的线）。
+    // 这条线平时由 bullet_ctrl 驱动，force 会临时盖过它，release 就还给炮弹。
+    task hit_player;
+        begin
+            @(negedge clock);
+            force u_top.b_hit_player = 1'b1;
+            @(negedge clock);
+            release u_top.b_hit_player;
             repeat (3) @(posedge clock);
         end
     endtask
@@ -200,9 +234,9 @@ module tb_stage;
         check_enemy_type("S01e slot0 = fast",  0, 2'd0);
         check_enemy_type("S01f slot1 = power", 1, 2'd1);
         check_enemy_type("S01g slot2 = armor", 2, 2'd2);
-        check_enemy_pos("S01h spawn point", 0, 10'd40, 10'd10);
-        check_enemy_pos("S01i spawn point", 1, 10'd300, 10'd10);
-        check_enemy_pos("S01j spawn point", 2, 10'd560, 10'd10);
+        check_enemy_pos("S01h spawn point", 0, 10'd40, 10'd0);
+        check_enemy_pos("S01i spawn point", 1, 10'd300, 10'd0);
+        check_enemy_pos("S01j spawn point", 2, 10'd560, 10'd0);
 
         // 第 1 关的地图（map.coe）在 (1,33) 是河
         check_cell("S01k level1 river at (1,33)", 1, 33, 4'd3);
@@ -218,7 +252,7 @@ module tb_stage;
         check_int("S03b refill waited for the timer",
                   ((j >= k - 2) && (j <= k + 8)) ? 1 : 0, 1);
         check_enemy_type("S03c 4th enemy = fast (L1 queue)", 0, 2'd0);
-        check_enemy_pos("S03d back to spawn point", 0, 10'd40, 10'd10);
+        check_enemy_pos("S03d back to spawn point", 0, 10'd40, 10'd0);
         check_int("S03e enemies_left = 3",       u_top.enemies_left, 3);
 
         // ---------------- S04 本关打完 -> STAGE CLEAR ----------------
@@ -243,24 +277,26 @@ module tb_stage;
         check_int("S05a level -> 2",              u_top.level, 2);
         check_int("S05b banner off",              u_top.stage_clear, 0);
         check_int("S05c no longer paused",        u_top.stage_paused, 0);
-        // 第 2 关：(1,33) 是空地（河往下挪了两块）；(21,25) 是钢板（第 5~6 块列的 SS）
+        // 第 2 关：(1,33) 是空地（第 2 关没有那条河）；(9,17) 是钢板
+        // （level2.txt 第 4 行第 2 列的 'SS'，展开到 4x4 格 = 像素 8..11 x 16..19）
         check_cell("S05d level2 no river at (1,33)", 1, 33, 4'd0);
-        check_cell("S05e level2 steel at (21,25)",   21, 25, 4'd2);
-        // 基地块展开：'H' 块在基地矩形外补砖 -> (56,118) 是砖
-        check_cell("S05f base pedestal is brick",    56, 118, 4'd1);
-        check_cell("S05g base itself is tile 5",     56, 112, 4'd5);
+        check_cell("S05e level2 steel at (9,17)",     9, 17, 4'd2);
+        // 基地块展开：'H' 块里只有 4x4 格是 tile 5（= 鹰的 20x20 包围盒），
+        // 该块剩下的格子补成砖 —— 砖墙因此紧贴着基地。
+        check_cell("S05f base shell is brick",      56, 112, 4'd1);
+        check_cell("S05g base itself is tile 5",     58, 113, 4'd5);
         check_cell("S05h last cell rewritten by loader", 119, 119, 4'd0);
 
         // ---------------- S06 新关开局 ----------------
         // level 一变就立刻检查会抢在 spawn 之前（开局那一屏是在接下来 3 拍里派出去的）
         repeat (10) @(posedge clock);
-        check_int("S06a player back to centre",  u_top.player_x, 10'd300);
+        check_int("S06a player back to spawn",  u_top.player_x, 10'd200);
         check_int("S06b 3 enemies again",        u_top.enemy_valid, 3'b111);
         check_int("S06c enemies_left reset to 4", u_top.enemies_left, ENEMIES);
         check_enemy_type("S06d slot0 = fast again",  0, 2'd0);
         check_enemy_type("S06e slot1 = power again", 1, 2'd1);
         check_enemy_type("S06f slot2 = armor again", 2, 2'd2);
-        check_enemy_pos("S06g back at spawn point 0", 0, 10'd40, 10'd10);
+        check_enemy_pos("S06g back at spawn point 0", 0, 10'd40, 10'd0);
 
         // ---------------- S07 GAME OVER 之后不再补车 ----------------
         // 先打掉一辆空出槽位，再让 game_over=1：补车计时照样会到点，
@@ -289,6 +325,65 @@ module tb_stage;
         wait_level(1, 60000);
         check_int("S08c wrapped to level 1",     u_top.level, 1);
         check_cell("S08d level1 river is back",  1, 33, 4'd3);
+
+        // ---------------- S09 GAME OVER 之后按 BTNC 重开一局 ----------------
+        // 这一条守的是“重开”整条链：BTNC 上升沿 -> restart_pulse -> sys_rst
+        // （top 里的生命/分数/基地/敌人/炮弹/特效）+ stage_ctrl 推到 S_LOAD
+        // （重新写第 1 关地图 + 玩家回出生点）。改之前 GAME OVER 是死锁的：
+        // freeze=1 把所有人冻住，按复位键又只清寄存器不重装地图（BRAM 里
+        // 留着打掉的砖），所以在板子上“重开”根本不好使。
+        do_reset;
+        check_int("S09a fresh game: level 1", u_top.level, 1);
+        hit_enemy(0);                       // 快速：+100 分，顺便弄脏状态
+        check_int("S09b score after one kill", u_top.score100, 1);
+        // 把第 1 关的河挖掉：重开必须把它写回来（证明地图真的重装了）
+        @(negedge clock);
+        u_top.u_map_ram.mem[33 * MAP_W + 1] = 4'd0;
+        check_cell("S09c river poked to empty", 1, 33, 4'd0);
+
+        // 三条命依次打光：3 -> 2 -> 1 -> 0 并锁存 GAME OVER
+        hit_player;
+        check_int("S09d lives 3 -> 2", u_top.lives, 2);
+        check_int("S09e respawn back at spawn", u_top.player_x, 10'd200);
+        hit_player;
+        check_int("S09f lives 2 -> 1", u_top.lives, 1);
+        check_int("S09g not over yet", u_top.game_over, 0);
+        hit_player;
+        check_int("S09h lives = 0",         u_top.lives, 0);
+        check_int("S09i game over latched", u_top.game_over, 1);
+        // GAME OVER 期间全场冻结：玩家再按方向键也不动
+        btn_left = 1'b1;
+        repeat (MOVE_DIV * 2) @(posedge clock);
+        btn_left = 1'b0;
+        check_int("S09j player frozen on game over", u_top.player_x, 10'd200);
+
+        // 按一下 BTNC（开火键）= 重开。只用上升沿，所以按一下、松手。
+        // 必须在 negedge 改按键：如果和 posedge 同一个 delta 里把 btn_fire 抬起来，
+        // top 里的 fire_d 可能在同一拍就采到 1，上升沿被“吃掉”（仿真特有的竞争）。
+        @(negedge clock);
+        btn_fire = 1'b1;
+        repeat (2) @(posedge clock);
+        @(negedge clock);
+        btn_fire = 1'b0;
+        repeat (4) @(posedge clock);
+
+        check_int("S09k restart clears game over", u_top.game_over, 0);
+        check_int("S09l lives restored",          u_top.lives, 3);   // LIVES_START
+        check_int("S09m score cleared",           u_top.score100, 0);
+        check_int("S09n base restored",           u_top.base_alive, 1);
+        check_int("S09o map reload started (paused)", u_top.stage_paused, 1);
+
+        wait_load;                          // 900 块 x 18 拍
+        repeat (200) @(posedge clock);      // 3 辆入场 + probe 各扫一遍
+        check_int("S09p level back to 1",   u_top.level, 1);
+        check_int("S09q no longer paused",  u_top.stage_paused, 0);
+        check_cell("S09r level1 map rewritten (river back)", 1, 33, 4'd3);
+        check_int("S09s player back to spawn x", u_top.player_x, 10'd200);
+        check_int("S09t player back to spawn y", u_top.player_y, 10'd560);
+        check_int("S09u 3 enemies again",        u_top.enemy_valid, 3'b111);
+        check_int("S09v enemies_left reset to 4", u_top.enemies_left, ENEMIES);
+        check_enemy_pos("S09w enemy0 back at spawn", 0, 10'd40, 10'd0);
+        check_int("S09x can play again (not frozen)", u_top.freeze, 0);
 
         $display("==============================================");
         if (errors == 0) $display("ALL TESTS PASSED");

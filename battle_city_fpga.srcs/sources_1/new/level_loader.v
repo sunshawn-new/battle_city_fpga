@@ -34,10 +34,10 @@ module level_loader #(
     parameter BROWS = 30,             // 多少块高（30）
     parameter MAP_W = 120,            // 地图多少格宽（BCOLS * 4）
     parameter LEVEL_SLOT = 1024,      // 关卡 ROM 里每关占多少项（900 向上取到 1024）
-    parameter HQ_X0 = 56,             // 基地本体（格坐标），和 map_generator.py 一致
-    parameter HQ_Y0 = 112,
-    parameter HQ_W  = 8,
-    parameter HQ_H  = 6
+    parameter HQ_X0 = 58,             // 基地本体（格坐标）= vga.v 那张 20x20 金鹰
+    parameter HQ_Y0 = 113,            // 精灵的包围盒，和 map_generator.py 一致
+    parameter HQ_W  = 4,
+    parameter HQ_H  = 4
 )(
     input             clock,
     input             reset,
@@ -82,7 +82,8 @@ module level_loader #(
     // 块内第 cc 格的格坐标：gx = bx*4 + cc[1:0]，gy = by*4 + cc[3:2]
     wire [6:0]  gx = {2'b0, bx, 2'b00} + {5'd0, cc[1:0]};
     wire [6:0]  gy = {2'b0, by, 2'b00} + {5'd0, cc[3:2]};
-    // 基地块：落在基地矩形里的格子是 5，其余补砖（基地坐在砖砌的台座上）
+    // 基地块：落在基地矩形（4x4 格 = 鹰的 20x20 包围盒）里的格子是 5，
+    // 该块其余格子补砖 —— 于是砖墙紧贴着鹰，基地被砖围住，没有黑缝。
     wire        in_hq = (gx >= HQ_X0) && (gx < HQ_X0 + HQ_W) &&
                         (gy >= HQ_Y0) && (gy < HQ_Y0 + HQ_H);
     wire [3:0]  tile  = (blk == 4'd5) ? (in_hq ? 4'd5 : 4'd1) : blk;

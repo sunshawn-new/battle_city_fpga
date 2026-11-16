@@ -115,6 +115,18 @@
           <Attr Name="UsedIn" Val="implementation"/>
         </FileInfo>
       </File>
+      <File Path="$PRUNDIR/blk_mem_tank_destroyed2_synth_1/blk_mem_tank_destroyed2.dcp">
+        <FileInfo>
+          <Attr Name="UsedIn" Val="synthesis"/>
+          <Attr Name="UsedIn" Val="implementation"/>
+        </FileInfo>
+      </File>
+      <File Path="$PRUNDIR/blk_mem_tank_destroyed1_synth_1/blk_mem_tank_destroyed1.dcp">
+        <FileInfo>
+          <Attr Name="UsedIn" Val="synthesis"/>
+          <Attr Name="UsedIn" Val="implementation"/>
+        </FileInfo>
+      </File>
       <File Path="$PRUNDIR/blk_mem_tank_armor_synth_1/blk_mem_tank_armor.dcp">
         <FileInfo>
           <Attr Name="UsedIn" Val="synthesis"/>
@@ -168,6 +180,13 @@
           <Attr Name="UsedIn" Val="simulation"/>
         </FileInfo>
       </File>
+      <File Path="$PSRCDIR/sources_1/ip/blk_mem_level_2/blk_mem_level.xci">
+        <FileInfo>
+          <Attr Name="UsedIn" Val="synthesis"/>
+          <Attr Name="UsedIn" Val="implementation"/>
+          <Attr Name="UsedIn" Val="simulation"/>
+        </FileInfo>
+      </File>
       <File Path="$PSRCDIR/sources_1/new/bullet-ctrl.v">
         <FileInfo>
           <Attr Name="UsedIn" Val="synthesis"/>
@@ -203,6 +222,13 @@
           <Attr Name="UsedIn" Val="simulation"/>
         </FileInfo>
       </File>
+      <File Path="$PSRCDIR/sources_1/new/level_loader.v">
+        <FileInfo>
+          <Attr Name="UsedIn" Val="synthesis"/>
+          <Attr Name="UsedIn" Val="implementation"/>
+          <Attr Name="UsedIn" Val="simulation"/>
+        </FileInfo>
+      </File>
       <File Path="$PSRCDIR/sources_1/new/map_bus.v">
         <FileInfo>
           <Attr Name="UsedIn" Val="synthesis"/>
@@ -211,6 +237,20 @@
         </FileInfo>
       </File>
       <File Path="$PSRCDIR/sources_1/new/player.v">
+        <FileInfo>
+          <Attr Name="UsedIn" Val="synthesis"/>
+          <Attr Name="UsedIn" Val="implementation"/>
+          <Attr Name="UsedIn" Val="simulation"/>
+        </FileInfo>
+      </File>
+      <File Path="$PSRCDIR/sources_1/new/stage_ctrl.v">
+        <FileInfo>
+          <Attr Name="UsedIn" Val="synthesis"/>
+          <Attr Name="UsedIn" Val="implementation"/>
+          <Attr Name="UsedIn" Val="simulation"/>
+        </FileInfo>
+      </File>
+      <File Path="$PSRCDIR/sources_1/new/tank_block.v">
         <FileInfo>
           <Attr Name="UsedIn" Val="synthesis"/>
           <Attr Name="UsedIn" Val="implementation"/>
@@ -317,6 +357,12 @@
         </FileInfo>
       </File>
       <File Path="$PPRDIR/tank_destroyed2_16bit.coe">
+        <FileInfo>
+          <Attr Name="UsedIn" Val="synthesis"/>
+          <Attr Name="UsedIn" Val="simulation"/>
+        </FileInfo>
+      </File>
+      <File Path="$PPRDIR/levels.coe">
         <FileInfo>
           <Attr Name="UsedIn" Val="synthesis"/>
           <Attr Name="UsedIn" Val="simulation"/>
@@ -451,6 +497,7 @@
     <FileSet Name="blk_mem_tank_destroyed1" Type="BlockSrcs" RelSrcDir="$PSRCDIR/blk_mem_tank_destroyed1" RelGenDir="$PGENDIR/blk_mem_tank_destroyed1">
       <File Path="$PSRCDIR/sources_1/ip/blk_mem_tank_destroyed1/blk_mem_tank_destroyed1.xci">
         <FileInfo>
+          <Attr Name="AutoDisabled" Val="1"/>
           <Attr Name="UsedIn" Val="synthesis"/>
           <Attr Name="UsedIn" Val="implementation"/>
           <Attr Name="UsedIn" Val="simulation"/>
@@ -464,6 +511,7 @@
     <FileSet Name="blk_mem_tank_destroyed2" Type="BlockSrcs" RelSrcDir="$PSRCDIR/blk_mem_tank_destroyed2" RelGenDir="$PGENDIR/blk_mem_tank_destroyed2">
       <File Path="$PSRCDIR/sources_1/ip/blk_mem_tank_destroyed2/blk_mem_tank_destroyed2.xci">
         <FileInfo>
+          <Attr Name="AutoDisabled" Val="1"/>
           <Attr Name="UsedIn" Val="synthesis"/>
           <Attr Name="UsedIn" Val="implementation"/>
           <Attr Name="UsedIn" Val="simulation"/>

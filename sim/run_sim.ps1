@@ -10,8 +10,8 @@
 # 用例：
 #   tb_terrain 地形碰撞（玩家移动 / 砖钢河树 / 基地顶盖 / 地图契约）
 #   tb_bullet  炮弹（对象池 / 飞行 / 打砖 / 命中坦克 / 弹对弹 / 归属）
-#   tb_enemy   敌人（AI / 兵种速度·血量·开火周期 / 冻结）
-#   tb_combat  关卡流程（生命 / 无敌 / 分数 / GAME OVER / 爆炸时机）
+#   tb_enemy   敌人（AI / 兵种速度·血量·开火周期 / 坦克互斥 / 冻结）
+#   tb_combat  关卡流程（生命 / 无敌 / 闪烁 / 分数 / GAME OVER / 爆炸时机）
 #   tb_hud     侧栏（边界 / 底色 / 文字 / 数字 / 图标 / 横幅）
 #   tb_fx      爆炸特效（槽池分配 / 相位 / 两帧 / 满池丢弃 / 复用）
 #   tb_stage   关卡与波次（块图装载 / 补车节奏 / STAGE CLEAR / 换关循环）
@@ -80,6 +80,7 @@ try {
         (Join-Path $src 'hud.v'),
         (Join-Path $src 'font5x7.v'),
         (Join-Path $src 'terrain_probe.v'),
+        (Join-Path $src 'tank_block.v'),
         (Join-Path $src 'map_bus.v'),
         (Join-Path $src 'bullet-ctrl.v'),
         (Join-Path $src 'fx_ctrl.v'),
@@ -90,13 +91,13 @@ try {
     # （Min 只是“下限”，防止某个用例被整段跳过还显示 PASS；
     #   改了测试台就顺手把这里上调，别让它长期偏小）
     $tbs = @(
-        [pscustomobject]@{ Name = 'tb_terrain'; File = 'tb_terrain.v'; Min = 24 },
+        [pscustomobject]@{ Name = 'tb_terrain'; File = 'tb_terrain.v'; Min = 25 },
         [pscustomobject]@{ Name = 'tb_bullet';  File = 'tb_bullet.v';  Min = 88 },
-        [pscustomobject]@{ Name = 'tb_enemy';   File = 'tb_enemy.v';   Min = 38 },
-        [pscustomobject]@{ Name = 'tb_combat';  File = 'tb_combat.v';  Min = 28 },
-        [pscustomobject]@{ Name = 'tb_hud';     File = 'tb_hud.v';     Min = 36 },
+        [pscustomobject]@{ Name = 'tb_enemy';   File = 'tb_enemy.v';   Min = 61 },
+        [pscustomobject]@{ Name = 'tb_combat';  File = 'tb_combat.v';  Min = 34 },
+        [pscustomobject]@{ Name = 'tb_hud';     File = 'tb_hud.v';     Min = 41 },
         [pscustomobject]@{ Name = 'tb_fx';      File = 'tb_fx.v';      Min = 30 },
-        [pscustomobject]@{ Name = 'tb_stage';   File = 'tb_stage.v';   Min = 40 }
+        [pscustomobject]@{ Name = 'tb_stage';   File = 'tb_stage.v';   Min = 67 }
     )
     $results = @()
 

@@ -70,6 +70,7 @@ module hud #(
     //     132  SCORE  /  160  nn00      分数
     //     192  LIVES  /  220  n         生命
     //     300  GAME OVER / STAGE CLEAR  结算横幅（闪烁）
+    //     322  PRESS BTNC              GAME OVER 时的重开提示
     //     556  BTNC=FIRE                按键提示
     //   所有文字行都是 14px 高（= 7 行 x 2 倍），所以 (y - y0) >> 1 就是字模行号。
     reg [3:0]  li;      // 行号，4'hF = 这一行不是文字
@@ -97,6 +98,10 @@ module hud #(
             li = 4'd7; lx0 = X0 + 11'd12; ly0 = 11'd556;
         end else if (game_over && y >= 11'd300 && y < 11'd314) begin
             li = 4'd8; lx0 = X0 + 11'd28; ly0 = 11'd300;
+        end else if (game_over && y >= 11'd322 && y < 11'd336) begin
+            // GAME OVER 下面再补一行"按 BTNC 重开"：板子上唯一的按键提示
+            // （y=556 那行会被玩家忽略，贴在横幅下面才看得见）。
+            li = 4'd10; lx0 = X0 + 11'd20; ly0 = 11'd322;
         end else if (victory && y >= 11'd300 && y < 11'd314) begin
             li = 4'd9; lx0 = X0 + 11'd12; ly0 = 11'd300;
         end
@@ -115,7 +120,8 @@ module hud #(
     // ASCII 常数表（避免到处写 "X" 这种字符串常量，读代码时也不容易看花眼）
     localparam [7:0] C_A = 8'h41, C_B = 8'h42, C_C = 8'h43, C_E = 8'h45,
                      C_F = 8'h46, C_G = 8'h47, C_I = 8'h49, C_L = 8'h4C,
-                     C_M = 8'h4D, C_N = 8'h4E, C_O = 8'h4F, C_R = 8'h52,
+                     C_M = 8'h4D, C_N = 8'h4E, C_O = 8'h4F, C_P = 8'h50,
+                     C_R = 8'h52,
                      C_S = 8'h53, C_T = 8'h54, C_V = 8'h56, C_Y = 8'h59,
                      C_0 = 8'h30, C_SP = 8'h20, C_EQ = 8'h3D;
 
@@ -208,6 +214,13 @@ module hud #(
                 4'd9: ch = C_A; 4'd10: ch = C_R;
                 default: ch = C_SP;
             endcase
+            4'd10: case (ci)            // PRESS BTNC（GAME OVER 后提示重开）
+                4'd0: ch = C_P; 4'd1: ch = C_R; 4'd2: ch = C_E;
+                4'd3: ch = C_S; 4'd4: ch = C_S; 4'd5: ch = C_SP;
+                4'd6: ch = C_B; 4'd7: ch = C_T; 4'd8: ch = C_N;
+                4'd9: ch = C_C;
+                default: ch = C_SP;
+            endcase
             default: ch = C_SP;
         endcase
     end
@@ -275,6 +288,7 @@ module hud #(
             4'd0:       text_color = 12'hFE0;   // 标题：黄
             4'd4, 4'd6: text_color = 12'hFFF;   // 数值：白
             4'd8, 4'd9: text_color = 12'hFFF;   // 横幅文字：白
+            4'd10:      text_color = blink ? 12'hFE0 : 12'h888;  // 重开提示：闪
             4'd7:       text_color = 12'h789;   // 底部提示：暗
             default:    text_color = 12'hADF;   // 标签：浅蓝
         endcase
