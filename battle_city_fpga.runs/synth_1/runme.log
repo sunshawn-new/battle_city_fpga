@@ -17,33 +17,33 @@ INFO: [Common 17-349] Got license for feature 'Synthesis' and/or device 'xc7a35t
 INFO: [Device 21-403] Loading part xc7a35tcpg236-1
 INFO: [Synth 8-7079] Multithreading enabled for synth_design using a maximum of 2 processes.
 INFO: [Synth 8-7078] Launching helper process for spawning children vivado processes
-INFO: [Synth 8-7075] Helper process launched with PID 32828
+INFO: [Synth 8-7075] Helper process launched with PID 22888
 ---------------------------------------------------------------------------------
-Starting RTL Elaboration : Time (s): cpu = 00:00:09 ; elapsed = 00:00:10 . Memory (MB): peak = 1217.445 ; gain = 0.000
+Starting RTL Elaboration : Time (s): cpu = 00:00:07 ; elapsed = 00:00:09 . Memory (MB): peak = 1217.273 ; gain = 0.000
 ---------------------------------------------------------------------------------
 INFO: [Synth 8-6157] synthesizing module 'top' [E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.srcs/sources_1/new/top.v:3]
-INFO: [Synth 8-6157] synthesizing module 'terrain_probe' [E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.srcs/sources_1/new/terrain_probe.v:34]
+INFO: [Synth 8-6157] synthesizing module 'terrain_probe' [E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.srcs/sources_1/new/terrain_probe.v:2]
 	Parameter MAP_W bound to: 120 - type: integer 
 	Parameter MAP_H bound to: 120 - type: integer 
 	Parameter TILE bound to: 5 - type: integer 
 	Parameter TANK_W bound to: 20 - type: integer 
 	Parameter TANK_H bound to: 20 - type: integer 
-INFO: [Synth 8-6155] done synthesizing module 'terrain_probe' (1#1) [E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.srcs/sources_1/new/terrain_probe.v:34]
-INFO: [Synth 8-6157] synthesizing module 'player' [E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.srcs/sources_1/new/player.v:16]
+INFO: [Synth 8-6155] done synthesizing module 'terrain_probe' (1#1) [E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.srcs/sources_1/new/terrain_probe.v:2]
+INFO: [Synth 8-6157] synthesizing module 'player' [E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.srcs/sources_1/new/player.v:2]
 	Parameter WIDTH bound to: 600 - type: integer 
 	Parameter HEIGHT bound to: 600 - type: integer 
 	Parameter TILE bound to: 5 - type: integer 
 	Parameter MOVE_DIV bound to: 4000000 - type: integer 
 	Parameter N_BLK bound to: 3 - type: integer 
-INFO: [Synth 8-6157] synthesizing module 'tank_block' [E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.srcs/sources_1/new/tank_block.v:45]
+INFO: [Synth 8-6157] synthesizing module 'tank_block' [E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.srcs/sources_1/new/tank_block.v:3]
 	Parameter N bound to: 3 - type: integer 
-INFO: [Synth 8-6155] done synthesizing module 'tank_block' (2#1) [E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.srcs/sources_1/new/tank_block.v:45]
-WARNING: [Synth 8-689] width (32) of port connection 'cy' does not match port width (10) of module 'tank_block' [E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.srcs/sources_1/new/player.v:77]
-WARNING: [Synth 8-689] width (32) of port connection 'cy' does not match port width (10) of module 'tank_block' [E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.srcs/sources_1/new/player.v:81]
-WARNING: [Synth 8-689] width (32) of port connection 'cx' does not match port width (10) of module 'tank_block' [E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.srcs/sources_1/new/player.v:85]
-WARNING: [Synth 8-689] width (32) of port connection 'cx' does not match port width (10) of module 'tank_block' [E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.srcs/sources_1/new/player.v:89]
-INFO: [Synth 8-6155] done synthesizing module 'player' (3#1) [E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.srcs/sources_1/new/player.v:16]
-INFO: [Synth 8-6157] synthesizing module 'enemy_ctrl' [E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.srcs/sources_1/new/enemy_ctrl.v:42]
+INFO: [Synth 8-6155] done synthesizing module 'tank_block' (2#1) [E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.srcs/sources_1/new/tank_block.v:3]
+WARNING: [Synth 8-689] width (32) of port connection 'cy' does not match port width (10) of module 'tank_block' [E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.srcs/sources_1/new/player.v:44]
+WARNING: [Synth 8-689] width (32) of port connection 'cy' does not match port width (10) of module 'tank_block' [E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.srcs/sources_1/new/player.v:48]
+WARNING: [Synth 8-689] width (32) of port connection 'cx' does not match port width (10) of module 'tank_block' [E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.srcs/sources_1/new/player.v:52]
+WARNING: [Synth 8-689] width (32) of port connection 'cx' does not match port width (10) of module 'tank_block' [E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.srcs/sources_1/new/player.v:56]
+INFO: [Synth 8-6155] done synthesizing module 'player' (3#1) [E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.srcs/sources_1/new/player.v:2]
+INFO: [Synth 8-6157] synthesizing module 'enemy_ctrl' [E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.srcs/sources_1/new/enemy_ctrl.v:3]
 	Parameter N_E bound to: 3 - type: integer 
 	Parameter WIDTH bound to: 600 - type: integer 
 	Parameter HEIGHT bound to: 600 - type: integer 
@@ -51,11 +51,11 @@ INFO: [Synth 8-6157] synthesizing module 'enemy_ctrl' [E:/college_studies/semest
 	Parameter MOVE_DIV bound to: 8000000 - type: integer 
 	Parameter TURN_TICKS bound to: 24 - type: integer 
 	Parameter FIRE_TICKS bound to: 4 - type: integer 
-INFO: [Synth 8-6157] synthesizing module 'tank_block__parameterized0' [E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.srcs/sources_1/new/tank_block.v:45]
+INFO: [Synth 8-6157] synthesizing module 'tank_block__parameterized0' [E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.srcs/sources_1/new/tank_block.v:3]
 	Parameter N bound to: 4 - type: integer 
-INFO: [Synth 8-6155] done synthesizing module 'tank_block__parameterized0' (3#1) [E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.srcs/sources_1/new/tank_block.v:45]
-INFO: [Synth 8-6155] done synthesizing module 'enemy_ctrl' (4#1) [E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.srcs/sources_1/new/enemy_ctrl.v:42]
-INFO: [Synth 8-6157] synthesizing module 'bullet_ctrl' [E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.srcs/sources_1/new/bullet-ctrl.v:69]
+INFO: [Synth 8-6155] done synthesizing module 'tank_block__parameterized0' (3#1) [E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.srcs/sources_1/new/tank_block.v:3]
+INFO: [Synth 8-6155] done synthesizing module 'enemy_ctrl' (4#1) [E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.srcs/sources_1/new/enemy_ctrl.v:3]
+INFO: [Synth 8-6157] synthesizing module 'bullet_ctrl' [E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.srcs/sources_1/new/bullet-ctrl.v:3]
 	Parameter N_B bound to: 4 - type: integer 
 	Parameter N_E bound to: 3 - type: integer 
 	Parameter SPEED_DIV bound to: 24'b000000111101000010010000 
@@ -66,32 +66,32 @@ INFO: [Synth 8-6157] synthesizing module 'bullet_ctrl' [E:/college_studies/semes
 	Parameter MAP_W bound to: 120 - type: integer 
 	Parameter MAP_H bound to: 120 - type: integer 
 	Parameter TILE bound to: 5 - type: integer 
-INFO: [Synth 8-6155] done synthesizing module 'bullet_ctrl' (5#1) [E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.srcs/sources_1/new/bullet-ctrl.v:69]
-INFO: [Synth 8-6157] synthesizing module 'fx_ctrl' [E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.srcs/sources_1/new/fx_ctrl.v:29]
+INFO: [Synth 8-6155] done synthesizing module 'bullet_ctrl' (5#1) [E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.srcs/sources_1/new/bullet-ctrl.v:3]
+INFO: [Synth 8-6157] synthesizing module 'fx_ctrl' [E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.srcs/sources_1/new/fx_ctrl.v:3]
 	Parameter N_FX bound to: 4 - type: integer 
 	Parameter N_E bound to: 3 - type: integer 
 	Parameter FX_DIV bound to: 8000000 - type: integer 
 	Parameter FX_PHASES bound to: 6 - type: integer 
-INFO: [Synth 8-6155] done synthesizing module 'fx_ctrl' (6#1) [E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.srcs/sources_1/new/fx_ctrl.v:29]
-INFO: [Synth 8-6157] synthesizing module 'map_bus' [E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.srcs/sources_1/new/map_bus.v:24]
+INFO: [Synth 8-6155] done synthesizing module 'fx_ctrl' (6#1) [E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.srcs/sources_1/new/fx_ctrl.v:3]
+INFO: [Synth 8-6157] synthesizing module 'map_bus' [E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.srcs/sources_1/new/map_bus.v:3]
 	Parameter N_PROBE bound to: 4 - type: integer 
-INFO: [Synth 8-6155] done synthesizing module 'map_bus' (7#1) [E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.srcs/sources_1/new/map_bus.v:24]
-INFO: [Synth 8-6157] synthesizing module 'stage_ctrl' [E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.srcs/sources_1/new/stage_ctrl.v:29]
+INFO: [Synth 8-6155] done synthesizing module 'map_bus' (7#1) [E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.srcs/sources_1/new/map_bus.v:3]
+INFO: [Synth 8-6157] synthesizing module 'stage_ctrl' [E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.srcs/sources_1/new/stage_ctrl.v:3]
 	Parameter N_E bound to: 3 - type: integer 
 	Parameter N_LEVELS bound to: 4 - type: integer 
 	Parameter ENEMIES_PER_STAGE bound to: 20 - type: integer 
 	Parameter SPAWN_CYCLES bound to: 300000000 - type: integer 
 	Parameter CLEAR_CYCLES bound to: 200000000 - type: integer 
-INFO: [Synth 8-6155] done synthesizing module 'stage_ctrl' (8#1) [E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.srcs/sources_1/new/stage_ctrl.v:29]
-INFO: [Synth 8-6157] synthesizing module 'level_loader' [E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.srcs/sources_1/new/level_loader.v:32]
+INFO: [Synth 8-6155] done synthesizing module 'stage_ctrl' (8#1) [E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.srcs/sources_1/new/stage_ctrl.v:3]
+INFO: [Synth 8-6157] synthesizing module 'level_loader' [E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.srcs/sources_1/new/level_loader.v:3]
 	Parameter MAP_W bound to: 120 - type: integer 
 	Parameter HQ_X0 bound to: 58 - type: integer 
 	Parameter HQ_Y0 bound to: 116 - type: integer 
 	Parameter HQ_W bound to: 4 - type: integer 
 	Parameter HQ_H bound to: 4 - type: integer 
-INFO: [Synth 8-6155] done synthesizing module 'level_loader' (9#1) [E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.srcs/sources_1/new/level_loader.v:32]
-INFO: [Synth 8-6157] synthesizing module 'blk_mem_level' [E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.runs/synth_1/.Xil/Vivado-36748-LAPTOP-8QJD8CCP/realtime/blk_mem_level_stub.v:6]
-INFO: [Synth 8-6155] done synthesizing module 'blk_mem_level' (10#1) [E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.runs/synth_1/.Xil/Vivado-36748-LAPTOP-8QJD8CCP/realtime/blk_mem_level_stub.v:6]
+INFO: [Synth 8-6155] done synthesizing module 'level_loader' (9#1) [E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.srcs/sources_1/new/level_loader.v:3]
+INFO: [Synth 8-6157] synthesizing module 'blk_mem_level' [E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.runs/synth_1/.Xil/Vivado-25988-LAPTOP-8QJD8CCP/realtime/blk_mem_level_stub.v:6]
+INFO: [Synth 8-6155] done synthesizing module 'blk_mem_level' (10#1) [E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.runs/synth_1/.Xil/Vivado-25988-LAPTOP-8QJD8CCP/realtime/blk_mem_level_stub.v:6]
 INFO: [Synth 8-6157] synthesizing module 'vga' [E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.srcs/sources_1/new/vga.v:3]
 	Parameter N_B bound to: 4 - type: integer 
 	Parameter N_E bound to: 3 - type: integer 
@@ -486,27 +486,27 @@ INFO: [Synth 8-638] synthesizing module 'blk_mem_player_tank' [e:/college_studie
 	Parameter C_EST_POWER_SUMMARY bound to: Estimated Power for IP     :     2.7096 mW - type: string 
 INFO: [Synth 8-3491] module 'blk_mem_gen_v8_4_4' declared at 'e:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.gen/sources_1/ip/blk_mem_gen_0/hdl/blk_mem_gen_v8_4_vhsyn_rfs.vhd:195321' bound to instance 'U0' of component 'blk_mem_gen_v8_4_4' [e:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.gen/sources_1/ip/blk_mem_player_tank/synth/blk_mem_player_tank.vhd:230]
 INFO: [Synth 8-256] done synthesizing module 'blk_mem_player_tank' (23#1) [e:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.gen/sources_1/ip/blk_mem_player_tank/synth/blk_mem_player_tank.vhd:67]
-INFO: [Synth 8-6157] synthesizing module 'blk_mem_tank_fast' [E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.runs/synth_1/.Xil/Vivado-36748-LAPTOP-8QJD8CCP/realtime/blk_mem_tank_fast_stub.v:6]
-INFO: [Synth 8-6155] done synthesizing module 'blk_mem_tank_fast' (24#1) [E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.runs/synth_1/.Xil/Vivado-36748-LAPTOP-8QJD8CCP/realtime/blk_mem_tank_fast_stub.v:6]
-INFO: [Synth 8-6157] synthesizing module 'blk_mem_tank_power' [E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.runs/synth_1/.Xil/Vivado-36748-LAPTOP-8QJD8CCP/realtime/blk_mem_tank_power_stub.v:6]
-INFO: [Synth 8-6155] done synthesizing module 'blk_mem_tank_power' (25#1) [E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.runs/synth_1/.Xil/Vivado-36748-LAPTOP-8QJD8CCP/realtime/blk_mem_tank_power_stub.v:6]
-INFO: [Synth 8-6157] synthesizing module 'blk_mem_tank_armor' [E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.runs/synth_1/.Xil/Vivado-36748-LAPTOP-8QJD8CCP/realtime/blk_mem_tank_armor_stub.v:6]
-INFO: [Synth 8-6155] done synthesizing module 'blk_mem_tank_armor' (26#1) [E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.runs/synth_1/.Xil/Vivado-36748-LAPTOP-8QJD8CCP/realtime/blk_mem_tank_armor_stub.v:6]
-INFO: [Synth 8-6157] synthesizing module 'blk_mem_tank_destroyed1' [E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.runs/synth_1/.Xil/Vivado-36748-LAPTOP-8QJD8CCP/realtime/blk_mem_tank_destroyed1_stub.v:6]
-INFO: [Synth 8-6155] done synthesizing module 'blk_mem_tank_destroyed1' (27#1) [E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.runs/synth_1/.Xil/Vivado-36748-LAPTOP-8QJD8CCP/realtime/blk_mem_tank_destroyed1_stub.v:6]
-INFO: [Synth 8-6157] synthesizing module 'blk_mem_tank_destroyed2' [E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.runs/synth_1/.Xil/Vivado-36748-LAPTOP-8QJD8CCP/realtime/blk_mem_tank_destroyed2_stub.v:6]
-INFO: [Synth 8-6155] done synthesizing module 'blk_mem_tank_destroyed2' (28#1) [E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.runs/synth_1/.Xil/Vivado-36748-LAPTOP-8QJD8CCP/realtime/blk_mem_tank_destroyed2_stub.v:6]
-INFO: [Synth 8-6157] synthesizing module 'blk_mem_headquarters' [E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.runs/synth_1/.Xil/Vivado-36748-LAPTOP-8QJD8CCP/realtime/blk_mem_headquarters_stub.v:6]
-INFO: [Synth 8-6155] done synthesizing module 'blk_mem_headquarters' (29#1) [E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.runs/synth_1/.Xil/Vivado-36748-LAPTOP-8QJD8CCP/realtime/blk_mem_headquarters_stub.v:6]
-INFO: [Synth 8-6157] synthesizing module 'blk_mem_hq_destroyed' [E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.runs/synth_1/.Xil/Vivado-36748-LAPTOP-8QJD8CCP/realtime/blk_mem_hq_destroyed_stub.v:6]
-INFO: [Synth 8-6155] done synthesizing module 'blk_mem_hq_destroyed' (30#1) [E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.runs/synth_1/.Xil/Vivado-36748-LAPTOP-8QJD8CCP/realtime/blk_mem_hq_destroyed_stub.v:6]
-INFO: [Synth 8-6157] synthesizing module 'blk_mem_bullet' [E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.runs/synth_1/.Xil/Vivado-36748-LAPTOP-8QJD8CCP/realtime/blk_mem_bullet_stub.v:6]
-INFO: [Synth 8-6155] done synthesizing module 'blk_mem_bullet' (31#1) [E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.runs/synth_1/.Xil/Vivado-36748-LAPTOP-8QJD8CCP/realtime/blk_mem_bullet_stub.v:6]
-INFO: [Synth 8-6157] synthesizing module 'hud' [E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.srcs/sources_1/new/hud.v:32]
+INFO: [Synth 8-6157] synthesizing module 'blk_mem_tank_fast' [E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.runs/synth_1/.Xil/Vivado-25988-LAPTOP-8QJD8CCP/realtime/blk_mem_tank_fast_stub.v:6]
+INFO: [Synth 8-6155] done synthesizing module 'blk_mem_tank_fast' (24#1) [E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.runs/synth_1/.Xil/Vivado-25988-LAPTOP-8QJD8CCP/realtime/blk_mem_tank_fast_stub.v:6]
+INFO: [Synth 8-6157] synthesizing module 'blk_mem_tank_power' [E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.runs/synth_1/.Xil/Vivado-25988-LAPTOP-8QJD8CCP/realtime/blk_mem_tank_power_stub.v:6]
+INFO: [Synth 8-6155] done synthesizing module 'blk_mem_tank_power' (25#1) [E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.runs/synth_1/.Xil/Vivado-25988-LAPTOP-8QJD8CCP/realtime/blk_mem_tank_power_stub.v:6]
+INFO: [Synth 8-6157] synthesizing module 'blk_mem_tank_armor' [E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.runs/synth_1/.Xil/Vivado-25988-LAPTOP-8QJD8CCP/realtime/blk_mem_tank_armor_stub.v:6]
+INFO: [Synth 8-6155] done synthesizing module 'blk_mem_tank_armor' (26#1) [E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.runs/synth_1/.Xil/Vivado-25988-LAPTOP-8QJD8CCP/realtime/blk_mem_tank_armor_stub.v:6]
+INFO: [Synth 8-6157] synthesizing module 'blk_mem_tank_destroyed1' [E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.runs/synth_1/.Xil/Vivado-25988-LAPTOP-8QJD8CCP/realtime/blk_mem_tank_destroyed1_stub.v:6]
+INFO: [Synth 8-6155] done synthesizing module 'blk_mem_tank_destroyed1' (27#1) [E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.runs/synth_1/.Xil/Vivado-25988-LAPTOP-8QJD8CCP/realtime/blk_mem_tank_destroyed1_stub.v:6]
+INFO: [Synth 8-6157] synthesizing module 'blk_mem_tank_destroyed2' [E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.runs/synth_1/.Xil/Vivado-25988-LAPTOP-8QJD8CCP/realtime/blk_mem_tank_destroyed2_stub.v:6]
+INFO: [Synth 8-6155] done synthesizing module 'blk_mem_tank_destroyed2' (28#1) [E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.runs/synth_1/.Xil/Vivado-25988-LAPTOP-8QJD8CCP/realtime/blk_mem_tank_destroyed2_stub.v:6]
+INFO: [Synth 8-6157] synthesizing module 'blk_mem_headquarters' [E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.runs/synth_1/.Xil/Vivado-25988-LAPTOP-8QJD8CCP/realtime/blk_mem_headquarters_stub.v:6]
+INFO: [Synth 8-6155] done synthesizing module 'blk_mem_headquarters' (29#1) [E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.runs/synth_1/.Xil/Vivado-25988-LAPTOP-8QJD8CCP/realtime/blk_mem_headquarters_stub.v:6]
+INFO: [Synth 8-6157] synthesizing module 'blk_mem_hq_destroyed' [E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.runs/synth_1/.Xil/Vivado-25988-LAPTOP-8QJD8CCP/realtime/blk_mem_hq_destroyed_stub.v:6]
+INFO: [Synth 8-6155] done synthesizing module 'blk_mem_hq_destroyed' (30#1) [E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.runs/synth_1/.Xil/Vivado-25988-LAPTOP-8QJD8CCP/realtime/blk_mem_hq_destroyed_stub.v:6]
+INFO: [Synth 8-6157] synthesizing module 'blk_mem_bullet' [E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.runs/synth_1/.Xil/Vivado-25988-LAPTOP-8QJD8CCP/realtime/blk_mem_bullet_stub.v:6]
+INFO: [Synth 8-6155] done synthesizing module 'blk_mem_bullet' (31#1) [E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.runs/synth_1/.Xil/Vivado-25988-LAPTOP-8QJD8CCP/realtime/blk_mem_bullet_stub.v:6]
+INFO: [Synth 8-6157] synthesizing module 'hud' [E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.srcs/sources_1/new/hud.v:3]
 	Parameter N_E bound to: 3 - type: integer 
-INFO: [Synth 8-6157] synthesizing module 'font5x7' [E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.srcs/sources_1/new/font5x7.v:17]
-INFO: [Synth 8-6155] done synthesizing module 'font5x7' (32#1) [E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.srcs/sources_1/new/font5x7.v:17]
-INFO: [Synth 8-6155] done synthesizing module 'hud' (33#1) [E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.srcs/sources_1/new/hud.v:32]
+INFO: [Synth 8-6157] synthesizing module 'font5x7' [E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.srcs/sources_1/new/font5x7.v:2]
+INFO: [Synth 8-6155] done synthesizing module 'font5x7' (32#1) [E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.srcs/sources_1/new/font5x7.v:2]
+INFO: [Synth 8-6155] done synthesizing module 'hud' (33#1) [E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.srcs/sources_1/new/hud.v:3]
 INFO: [Synth 8-6155] done synthesizing module 'vga' (34#1) [E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.srcs/sources_1/new/vga.v:3]
 INFO: [Synth 8-638] synthesizing module 'blk_mem_gen_0' [e:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.gen/sources_1/ip/blk_mem_gen_0/synth/blk_mem_gen_0.vhd:74]
 	Parameter C_FAMILY bound to: artix7 - type: string 
@@ -588,18 +588,18 @@ INFO: [Synth 8-3491] module 'blk_mem_gen_v8_4_4' declared at 'e:/college_studies
 INFO: [Synth 8-256] done synthesizing module 'blk_mem_gen_0' (37#1) [e:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.gen/sources_1/ip/blk_mem_gen_0/synth/blk_mem_gen_0.vhd:74]
 INFO: [Synth 8-6155] done synthesizing module 'top' (38#1) [E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.srcs/sources_1/new/top.v:3]
 ---------------------------------------------------------------------------------
-Finished RTL Elaboration : Time (s): cpu = 00:01:54 ; elapsed = 00:02:01 . Memory (MB): peak = 1983.945 ; gain = 766.500
+Finished RTL Elaboration : Time (s): cpu = 00:01:38 ; elapsed = 00:01:46 . Memory (MB): peak = 1983.758 ; gain = 766.484
 ---------------------------------------------------------------------------------
 ---------------------------------------------------------------------------------
 Start Handling Custom Attributes
 ---------------------------------------------------------------------------------
 ---------------------------------------------------------------------------------
-Finished Handling Custom Attributes : Time (s): cpu = 00:01:56 ; elapsed = 00:02:03 . Memory (MB): peak = 1983.945 ; gain = 766.500
+Finished Handling Custom Attributes : Time (s): cpu = 00:01:39 ; elapsed = 00:01:47 . Memory (MB): peak = 1983.758 ; gain = 766.484
 ---------------------------------------------------------------------------------
 ---------------------------------------------------------------------------------
-Finished RTL Optimization Phase 1 : Time (s): cpu = 00:01:56 ; elapsed = 00:02:03 . Memory (MB): peak = 1983.945 ; gain = 766.500
+Finished RTL Optimization Phase 1 : Time (s): cpu = 00:01:39 ; elapsed = 00:01:47 . Memory (MB): peak = 1983.758 ; gain = 766.484
 ---------------------------------------------------------------------------------
-Netlist sorting complete. Time (s): cpu = 00:00:00 ; elapsed = 00:00:00.164 . Memory (MB): peak = 1983.945 ; gain = 0.000
+Netlist sorting complete. Time (s): cpu = 00:00:00 ; elapsed = 00:00:00.142 . Memory (MB): peak = 1983.758 ; gain = 0.000
 INFO: [Netlist 29-17] Analyzing 9 Unisim elements for replacement
 INFO: [Netlist 29-28] Unisim Transformation completed in 0 CPU seconds
 INFO: [Project 1-570] Preparing netlist for logic optimization
@@ -632,21 +632,21 @@ Parsing XDC File [E:/college_studies/semester202609/battle_city_fpga/battle_city
 Finished Parsing XDC File [E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.runs/synth_1/dont_touch.xdc]
 Completed Processing XDC Constraints
 
-Netlist sorting complete. Time (s): cpu = 00:00:00 ; elapsed = 00:00:00.005 . Memory (MB): peak = 1983.945 ; gain = 0.000
+Netlist sorting complete. Time (s): cpu = 00:00:00 ; elapsed = 00:00:00.004 . Memory (MB): peak = 1983.758 ; gain = 0.000
 INFO: [Project 1-111] Unisim Transformation Summary:
 No Unisim elements were transformed.
 
-Constraint Validation Runtime : Time (s): cpu = 00:00:01 ; elapsed = 00:00:00.217 . Memory (MB): peak = 1983.945 ; gain = 0.000
+Constraint Validation Runtime : Time (s): cpu = 00:00:00 ; elapsed = 00:00:00.215 . Memory (MB): peak = 1983.758 ; gain = 0.000
 WARNING: [Timing 38-316] Clock period '20.000' specified during out-of-context synthesis of instance 'u_level_rom' at clock pin 'clka' is different from the actual clock period '10.000', this can lead to different synthesis results.
 ---------------------------------------------------------------------------------
-Finished Constraint Validation : Time (s): cpu = 00:02:13 ; elapsed = 00:02:23 . Memory (MB): peak = 1983.945 ; gain = 766.500
+Finished Constraint Validation : Time (s): cpu = 00:01:53 ; elapsed = 00:02:03 . Memory (MB): peak = 1983.758 ; gain = 766.484
 ---------------------------------------------------------------------------------
 ---------------------------------------------------------------------------------
 Start Loading Part and Timing Information
 ---------------------------------------------------------------------------------
 Loading part: xc7a35tcpg236-1
 ---------------------------------------------------------------------------------
-Finished Loading Part and Timing Information : Time (s): cpu = 00:02:13 ; elapsed = 00:02:23 . Memory (MB): peak = 1983.945 ; gain = 766.500
+Finished Loading Part and Timing Information : Time (s): cpu = 00:01:53 ; elapsed = 00:02:03 . Memory (MB): peak = 1983.758 ; gain = 766.484
 ---------------------------------------------------------------------------------
 ---------------------------------------------------------------------------------
 Start Applying 'set_property' XDC Constraints
@@ -658,7 +658,7 @@ Applied set_property KEEP_HIERARCHY = SOFT for u_vga/steel_rom. (constraint file
 Applied set_property KEEP_HIERARCHY = SOFT for u_vga/river_rom. (constraint file  auto generated constraint).
 Applied set_property KEEP_HIERARCHY = SOFT for u_vga/brick_rom. (constraint file  auto generated constraint).
 ---------------------------------------------------------------------------------
-Finished applying 'set_property' XDC Constraints : Time (s): cpu = 00:02:14 ; elapsed = 00:02:23 . Memory (MB): peak = 1983.945 ; gain = 766.500
+Finished applying 'set_property' XDC Constraints : Time (s): cpu = 00:01:53 ; elapsed = 00:02:03 . Memory (MB): peak = 1983.758 ; gain = 766.484
 ---------------------------------------------------------------------------------
 INFO: [Synth 8-802] inferred FSM for state register 'state_reg' in module 'level_loader'
 ---------------------------------------------------------------------------------------------------
@@ -672,7 +672,7 @@ INFO: [Synth 8-802] inferred FSM for state register 'state_reg' in module 'level
 ---------------------------------------------------------------------------------------------------
 INFO: [Synth 8-3354] encoded FSM with state register 'state_reg' using encoding 'one-hot' in module 'level_loader'
 ---------------------------------------------------------------------------------
-Finished RTL Optimization Phase 2 : Time (s): cpu = 00:02:19 ; elapsed = 00:02:30 . Memory (MB): peak = 1983.945 ; gain = 766.500
+Finished RTL Optimization Phase 2 : Time (s): cpu = 00:01:57 ; elapsed = 00:02:08 . Memory (MB): peak = 1983.758 ; gain = 766.484
 ---------------------------------------------------------------------------------
 ---------------------------------------------------------------------------------
 Start RTL Component Statistics 
@@ -687,11 +687,11 @@ Detailed RTL Component Info :
 	   4 Input   15 Bit       Adders := 9     
 	   5 Input   15 Bit       Adders := 1     
 	   3 Input   15 Bit       Adders := 1     
-	   3 Input   12 Bit       Adders := 8     
+	   3 Input   12 Bit       Adders := 32    
 	   4 Input   12 Bit       Adders := 1     
 	   5 Input   12 Bit       Adders := 1     
-	   2 Input   11 Bit       Adders := 38    
-	   3 Input   11 Bit       Adders := 98    
+	   2 Input   11 Bit       Adders := 46    
+	   3 Input   11 Bit       Adders := 74    
 	   2 Input   10 Bit       Adders := 44    
 	   2 Input    9 Bit       Adders := 13    
 	   3 Input    9 Bit       Adders := 17    
@@ -703,7 +703,7 @@ Detailed RTL Component Info :
 	   2 Input    5 Bit       Adders := 4     
 	   2 Input    4 Bit       Adders := 12    
 	   3 Input    4 Bit       Adders := 1     
-	   2 Input    3 Bit       Adders := 17    
+	   2 Input    3 Bit       Adders := 16    
 	   2 Input    2 Bit       Adders := 10    
 +---XORs : 
 	   2 Input      2 Bit         XORs := 6     
@@ -724,9 +724,9 @@ Detailed RTL Component Info :
 	                6 Bit    Registers := 6     
 	                5 Bit    Registers := 2     
 	                4 Bit    Registers := 30    
-	                3 Bit    Registers := 23    
+	                3 Bit    Registers := 24    
 	                2 Bit    Registers := 40    
-	                1 Bit    Registers := 89    
+	                1 Bit    Registers := 91    
 +---Muxes : 
 	   2 Input   40 Bit        Muxes := 6     
 	   2 Input   35 Bit        Muxes := 1     
@@ -746,7 +746,7 @@ Detailed RTL Component Info :
 	   4 Input   12 Bit        Muxes := 2     
 	   8 Input   12 Bit        Muxes := 1     
 	   2 Input   12 Bit        Muxes := 7     
-	   2 Input   11 Bit        Muxes := 74    
+	   2 Input   11 Bit        Muxes := 50    
 	   2 Input   10 Bit        Muxes := 114   
 	   4 Input   10 Bit        Muxes := 10    
 	  12 Input   10 Bit        Muxes := 2     
@@ -769,10 +769,9 @@ Detailed RTL Component Info :
 	   2 Input    4 Bit        Muxes := 71    
 	   4 Input    4 Bit        Muxes := 6     
 	  11 Input    4 Bit        Muxes := 1     
-	   2 Input    3 Bit        Muxes := 40    
-	   4 Input    3 Bit        Muxes := 3     
+	   2 Input    3 Bit        Muxes := 42    
+	   4 Input    3 Bit        Muxes := 4     
 	  11 Input    3 Bit        Muxes := 3     
-	   6 Input    3 Bit        Muxes := 1     
 	   5 Input    3 Bit        Muxes := 2     
 	   2 Input    2 Bit        Muxes := 54    
 	   3 Input    2 Bit        Muxes := 8     
@@ -783,7 +782,7 @@ Detailed RTL Component Info :
 	   2 Input    1 Bit        Muxes := 338   
 	   4 Input    1 Bit        Muxes := 22    
 	  11 Input    1 Bit        Muxes := 16    
-	   3 Input    1 Bit        Muxes := 7     
+	   3 Input    1 Bit        Muxes := 6     
 	  13 Input    1 Bit        Muxes := 1     
 	   5 Input    1 Bit        Muxes := 1     
 ---------------------------------------------------------------------------------
@@ -822,7 +821,7 @@ DSP Report: operator div5_return0 is absorbed into DSP div5_return0.
 DSP Report: Generating DSP div5_return0, operation Mode is: A*(B:0xcd).
 DSP Report: operator div5_return0 is absorbed into DSP div5_return0.
 ---------------------------------------------------------------------------------
-Finished Cross Boundary and Area Optimization : Time (s): cpu = 00:03:13 ; elapsed = 00:03:28 . Memory (MB): peak = 1983.945 ; gain = 766.500
+Finished Cross Boundary and Area Optimization : Time (s): cpu = 00:02:37 ; elapsed = 00:02:49 . Memory (MB): peak = 1983.758 ; gain = 766.484
 ---------------------------------------------------------------------------------
 ---------------------------------------------------------------------------------
 Start ROM, RAM, DSP, Shift Register and Retiming Reporting
@@ -861,19 +860,19 @@ Finished ROM, RAM, DSP, Shift Register and Retiming Reporting
 Start Applying XDC Timing Constraints
 ---------------------------------------------------------------------------------
 ---------------------------------------------------------------------------------
-Finished Applying XDC Timing Constraints : Time (s): cpu = 00:03:25 ; elapsed = 00:03:41 . Memory (MB): peak = 1983.945 ; gain = 766.500
+Finished Applying XDC Timing Constraints : Time (s): cpu = 00:02:47 ; elapsed = 00:03:00 . Memory (MB): peak = 1983.758 ; gain = 766.484
 ---------------------------------------------------------------------------------
 ---------------------------------------------------------------------------------
 Start Timing Optimization
 ---------------------------------------------------------------------------------
 ---------------------------------------------------------------------------------
-Finished Timing Optimization : Time (s): cpu = 00:03:39 ; elapsed = 00:03:55 . Memory (MB): peak = 1983.945 ; gain = 766.500
+Finished Timing Optimization : Time (s): cpu = 00:02:58 ; elapsed = 00:03:12 . Memory (MB): peak = 1983.758 ; gain = 766.484
 ---------------------------------------------------------------------------------
 ---------------------------------------------------------------------------------
 Start Technology Mapping
 ---------------------------------------------------------------------------------
 ---------------------------------------------------------------------------------
-Finished Technology Mapping : Time (s): cpu = 00:03:46 ; elapsed = 00:04:03 . Memory (MB): peak = 1983.945 ; gain = 766.500
+Finished Technology Mapping : Time (s): cpu = 00:03:05 ; elapsed = 00:03:19 . Memory (MB): peak = 1983.758 ; gain = 766.484
 ---------------------------------------------------------------------------------
 ---------------------------------------------------------------------------------
 Start IO Insertion
@@ -891,37 +890,37 @@ Start Final Netlist Cleanup
 Finished Final Netlist Cleanup
 ---------------------------------------------------------------------------------
 ---------------------------------------------------------------------------------
-Finished IO Insertion : Time (s): cpu = 00:03:51 ; elapsed = 00:04:08 . Memory (MB): peak = 1983.945 ; gain = 766.500
+Finished IO Insertion : Time (s): cpu = 00:03:09 ; elapsed = 00:03:24 . Memory (MB): peak = 1983.758 ; gain = 766.484
 ---------------------------------------------------------------------------------
 ---------------------------------------------------------------------------------
 Start Renaming Generated Instances
 ---------------------------------------------------------------------------------
 ---------------------------------------------------------------------------------
-Finished Renaming Generated Instances : Time (s): cpu = 00:03:51 ; elapsed = 00:04:08 . Memory (MB): peak = 1983.945 ; gain = 766.500
+Finished Renaming Generated Instances : Time (s): cpu = 00:03:09 ; elapsed = 00:03:24 . Memory (MB): peak = 1983.758 ; gain = 766.484
 ---------------------------------------------------------------------------------
 ---------------------------------------------------------------------------------
 Start Rebuilding User Hierarchy
 ---------------------------------------------------------------------------------
 ---------------------------------------------------------------------------------
-Finished Rebuilding User Hierarchy : Time (s): cpu = 00:03:53 ; elapsed = 00:04:09 . Memory (MB): peak = 1983.945 ; gain = 766.500
+Finished Rebuilding User Hierarchy : Time (s): cpu = 00:03:11 ; elapsed = 00:03:25 . Memory (MB): peak = 1983.758 ; gain = 766.484
 ---------------------------------------------------------------------------------
 ---------------------------------------------------------------------------------
 Start Renaming Generated Ports
 ---------------------------------------------------------------------------------
 ---------------------------------------------------------------------------------
-Finished Renaming Generated Ports : Time (s): cpu = 00:03:53 ; elapsed = 00:04:09 . Memory (MB): peak = 1983.945 ; gain = 766.500
+Finished Renaming Generated Ports : Time (s): cpu = 00:03:11 ; elapsed = 00:03:25 . Memory (MB): peak = 1983.758 ; gain = 766.484
 ---------------------------------------------------------------------------------
 ---------------------------------------------------------------------------------
 Start Handling Custom Attributes
 ---------------------------------------------------------------------------------
 ---------------------------------------------------------------------------------
-Finished Handling Custom Attributes : Time (s): cpu = 00:03:53 ; elapsed = 00:04:10 . Memory (MB): peak = 1983.945 ; gain = 766.500
+Finished Handling Custom Attributes : Time (s): cpu = 00:03:11 ; elapsed = 00:03:26 . Memory (MB): peak = 1983.758 ; gain = 766.484
 ---------------------------------------------------------------------------------
 ---------------------------------------------------------------------------------
 Start Renaming Generated Nets
 ---------------------------------------------------------------------------------
 ---------------------------------------------------------------------------------
-Finished Renaming Generated Nets : Time (s): cpu = 00:03:53 ; elapsed = 00:04:10 . Memory (MB): peak = 1983.945 ; gain = 766.500
+Finished Renaming Generated Nets : Time (s): cpu = 00:03:11 ; elapsed = 00:03:26 . Memory (MB): peak = 1983.758 ; gain = 766.484
 ---------------------------------------------------------------------------------
 ---------------------------------------------------------------------------------
 Start Writing Synthesis Report
@@ -956,44 +955,44 @@ Report Cell Usage:
 |8     |blk_mem_tank_fast       |     1|
 |9     |blk_mem_tank_power      |     1|
 |10    |BUFG                    |     2|
-|11    |CARRY4                  |   767|
+|11    |CARRY4                  |   735|
 |12    |DSP48E1                 |    10|
-|15    |LUT1                    |   262|
-|16    |LUT2                    |  1520|
-|17    |LUT3                    |   792|
-|18    |LUT4                    |  1610|
-|19    |LUT5                    |   886|
-|20    |LUT6                    |  1642|
-|21    |MUXF7                   |    34|
+|15    |LUT1                    |   424|
+|16    |LUT2                    |  1397|
+|17    |LUT3                    |   838|
+|18    |LUT4                    |  1386|
+|19    |LUT5                    |   946|
+|20    |LUT6                    |  1803|
+|21    |MUXF7                   |    33|
 |22    |MUXF8                   |     3|
 |23    |RAMB18E1                |     5|
 |28    |RAMB36E1                |     4|
-|32    |FDRE                    |  1815|
+|32    |FDRE                    |  1820|
 |33    |FDSE                    |   127|
 |34    |IBUF                    |     7|
 |35    |OBUF                    |    14|
 +------+------------------------+------+
 ---------------------------------------------------------------------------------
-Finished Writing Synthesis Report : Time (s): cpu = 00:03:53 ; elapsed = 00:04:10 . Memory (MB): peak = 1983.945 ; gain = 766.500
+Finished Writing Synthesis Report : Time (s): cpu = 00:03:11 ; elapsed = 00:03:26 . Memory (MB): peak = 1983.758 ; gain = 766.484
 ---------------------------------------------------------------------------------
 Synthesis finished with 0 errors, 0 critical warnings and 0 warnings.
-Synthesis Optimization Runtime : Time (s): cpu = 00:01:49 ; elapsed = 00:04:00 . Memory (MB): peak = 1983.945 ; gain = 766.500
-Synthesis Optimization Complete : Time (s): cpu = 00:03:54 ; elapsed = 00:04:10 . Memory (MB): peak = 1983.945 ; gain = 766.500
+Synthesis Optimization Runtime : Time (s): cpu = 00:01:23 ; elapsed = 00:03:16 . Memory (MB): peak = 1983.758 ; gain = 766.484
+Synthesis Optimization Complete : Time (s): cpu = 00:03:11 ; elapsed = 00:03:26 . Memory (MB): peak = 1983.758 ; gain = 766.484
 INFO: [Project 1-571] Translating synthesized netlist
-Netlist sorting complete. Time (s): cpu = 00:00:00 ; elapsed = 00:00:00.152 . Memory (MB): peak = 1983.945 ; gain = 0.000
-INFO: [Netlist 29-17] Analyzing 823 Unisim elements for replacement
+Netlist sorting complete. Time (s): cpu = 00:00:01 ; elapsed = 00:00:00.171 . Memory (MB): peak = 1983.758 ; gain = 0.000
+INFO: [Netlist 29-17] Analyzing 790 Unisim elements for replacement
 INFO: [Netlist 29-28] Unisim Transformation completed in 0 CPU seconds
 INFO: [Project 1-570] Preparing netlist for logic optimization
 INFO: [Opt 31-138] Pushed 0 inverter(s) to 0 load pin(s).
-Netlist sorting complete. Time (s): cpu = 00:00:00 ; elapsed = 00:00:00.003 . Memory (MB): peak = 1983.945 ; gain = 0.000
+Netlist sorting complete. Time (s): cpu = 00:00:00 ; elapsed = 00:00:00.006 . Memory (MB): peak = 1983.758 ; gain = 0.000
 INFO: [Project 1-111] Unisim Transformation Summary:
 No Unisim elements were transformed.
 
-Synth Design complete, checksum: e13a3e7f
+Synth Design complete, checksum: 3e718af1
 INFO: [Common 17-83] Releasing license: Synthesis
 83 Infos, 5 Warnings, 0 Critical Warnings and 0 Errors encountered.
 synth_design completed successfully
-synth_design: Time (s): cpu = 00:04:03 ; elapsed = 00:04:24 . Memory (MB): peak = 1983.945 ; gain = 766.500
+synth_design: Time (s): cpu = 00:03:20 ; elapsed = 00:03:47 . Memory (MB): peak = 1983.758 ; gain = 766.484
 INFO: [Common 17-1381] The checkpoint 'E:/college_studies/semester202609/battle_city_fpga/battle_city_fpga.runs/synth_1/top.dcp' has been generated.
 INFO: [runtcl-4] Executing : report_utilization -file top_utilization_synth.rpt -pb top_utilization_synth.pb
-INFO: [Common 17-206] Exiting Vivado at Tue Nov 17 14:59:39 2026...
+INFO: [Common 17-206] Exiting Vivado at Tue Nov 17 18:36:27 2026...

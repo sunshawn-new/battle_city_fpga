@@ -1,68 +1,33 @@
 `timescale 1ns / 1ps
 
-// ============================================================================
-//  hud —— 右侧信息栏（x = 600..799）：分数 / 关卡 / 敌人 / 生命 / 结算横幅
-//
-//  【为什么单独一个模块】
-//    vga.v 已经负责「地图 + 坦克 + 炮弹 + 基地」的一整条像素流水线，再塞进
-//    文字排版就彻底读不动了。HUD 只吃「像素坐标 + 几个状态量」，输出「这个
-//    像素算不算侧栏、是什么颜色」，和地图/贴图完全解耦 —— 也就不受 600x600
-//    玩区尺寸的影响（改玩区宽度只要改这里的 X0）。
-//
-//  【排版：字模 5x7、放大 2 倍、字距 16px】
-//    5x7 的字模放大 2 倍是 10x14，看起来清楚又不占地方；字距取 16 而不是 12，
-//    是为了让「第几个字符 = (x - 行首) >> 4」变成一条移位 —— 不用除法器。
-//    一屏最多 12 个字符（12*16 = 192 < 200），够写 BATTLE CITY（11 个）。
-//
-//  【字形从哪来】
-//    font5x7.v（由 pysrc/gen_font.py 从 pysrc/font5x7.py 生成，纯组合 LUT）。
-//    没有用 BRAM ROM：42 个字形综合出来才一百多个 LUT，比「新建 IP + coe +
-//    仿真桩 + check_mif 期望值」那一整套便宜太多。
-//
-//  【敌人图标】
-//    复用敌人坦克的贴图 ROM：本模块只输出 icon_on / icon_addr / icon_type，
-//    由 vga.v 把坦克 ROM 的地址 mux 过去（见 vga.v 里 tank_rom_addr 的注释）。
-//    这样图标和场上的坦克长得一模一样，而且不用再多一张贴图。
-//
-//  【和像素流水线的对齐】
-//    map/贴图 ROM 都是 1 拍读延迟，vga.v 里已经有一整套 _d1 信号。本模块的
-//    输入坐标必须喂「已经延迟 1 拍」的 img_x/img_y（vga.v 的 img_x_d1/img_y_d1），
-//    输出的颜色才是组合的、和背景同一时刻 —— 否则整块侧栏会左移 1 像素。
-// ============================================================================
 module hud #(
-    parameter N_E = 3                  // 敌方坦克辆数（决定图标个数）
+    parameter N_E = 3   
 )(
-    input             clock,           // vga_clk（50MHz），只用来做闪烁计时
+    input             clock,  
     input             reset,
-    // ---------------- 像素坐标（0..799 / 0..599，已延迟 1 拍）----------------
     input      [10:0] x,
     input      [10:0] y,
-    // ---------------- 显示用的状态 ----------------
-    input      [3:0]  score100,        // 分数 = score100 * 100（见 top.v 的说明）
+    input      [3:0]  score100,   
     input      [2:0]  lives,
     input      [2:0]  level,
-    input      [5:0]  enemy_left,      // 本关还剩多少辆敌人（含场上活着的）
+    input      [5:0]  enemy_left,   
     input      [N_E-1:0]   enemy_valid,
-    input      [N_E*2-1:0] enemy_type,  // 图标按兵种选贴图
-    input             game_over,        // 基地被摧毁 / 生命耗尽
-    input             victory,          // 敌人全灭
-    // ---------------- 输出 ----------------
-    output            hud_on,           // 1 = 这个像素属于侧栏（vga 用它抢占图层）
+    input      [N_E*2-1:0] enemy_type, 
+    input             game_over, 
+    input             victory,    
+    output            hud_on,   
     output reg [11:0] rgb,
-    output            icon_on,          // 1 = 这个像素落在某个敌人图标格子里
-    output     [8:0]  icon_addr,        // 该图标格的 20x20 贴图地址（朝下）
-    output     [1:0]  icon_type         // 该格对应的兵种
+    output            icon_on,   
+    output     [8:0]  icon_addr,  
+    output     [1:0]  icon_type   
 );
-    // 侧栏从 x = 600 开始；面板宽 200px
     localparam [10:0] X0 = 11'd600;
 
     wire        in_panel = (x >= X0);
-    wire [10:0] px       = x - X0;      // 面板内横坐标 0..199
+    wire [10:0] px       = x - X0;  
 
     assign hud_on = in_panel;
 
-    // ================= 1. 选行：y -> 这一扫描线属于哪一行文字 =================
-    //   行表（y0 / 行首 x / 内容）：
     //     16   BATTLE CITY              标题
     //     44   LEVEL n                  关卡
     //     76   ENEMY nn                敌人（+ 本关剩余数，两位十进制）
@@ -107,15 +72,13 @@ module hud #(
         end
     end
 
-    // ================= 2. 选字符：行内第几个 + 查字形 =================
     // 注意：这里必须用【绝对】x 减行首 x0（lx0 是绝对坐标），
-    // 不能用上面的面板内坐标 px —— px 已经减过一次 600 了，再减 612 会回绕。
-    wire [10:0] rel = x - lx0;          // 负数会回绕成大数，被下面的范围检查挡掉
-    wire [3:0]  ci  = rel[7:4];         // 第几个字符（每格 16px）
-    wire [3:0]  col = rel[3:0];         // 格内 x（0..9 是字形，10..15 是字距）
-    wire [10:0] gy0 = y - ly0;          // 行内 y（0..13）
-    wire [2:0]  gry = gy0[3:1];         // 字模行号（0..6）
-    wire        in_text = (rel < 11'd176);   // 一行最多 11 个字符
+    wire [10:0] rel = x - lx0;    
+    wire [3:0]  ci  = rel[7:4];  
+    wire [3:0]  col = rel[3:0];   
+    wire [10:0] gy0 = y - ly0;   
+    wire [2:0]  gry = gy0[3:1];  
+    wire        in_text = (rel < 11'd176);  
 
     // ASCII 常数表（避免到处写 "X" 这种字符串常量，读代码时也不容易看花眼）
     localparam [7:0] C_A = 8'h41, C_B = 8'h42, C_C = 8'h43, C_E = 8'h45,
@@ -137,13 +100,9 @@ module hud #(
         end
     endfunction
 
-    // 分数的十进制位：分数永远是 100 的倍数（杀一辆车 +100/200/300），
-    // 所以只要 score100 的十位和个位，后面两位恒为 0 —— 零除法器。
     wire [3:0] sc_hi = (score100 >= 4'd10) ? 4'd1 : 4'd0;
     wire [3:0] sc_lo = score100 - (sc_hi * 4'd10);
 
-    // 剩余敌人数的两位十进制（0..43：每关最多 20 辆，加上场上的 3 辆不会溢出）。
-    // 同样是“比较链 + 一次乘 10”，没有除法器：6 位比较器 5 个，十几 LUT。
     wire [3:0] el_hi = (enemy_left >= 6'd40) ? 4'd4 :
                        (enemy_left >= 6'd30) ? 4'd3 :
                        (enemy_left >= 6'd20) ? 4'd2 :
@@ -152,7 +111,7 @@ module hud #(
 
     reg [7:0] ch;
     always @(*) begin
-        ch = C_SP;                      // 默认空格
+        ch = C_SP;  
         case (li)
             4'd0: case (ci)             // BATTLE CITY
                 4'd0: ch = C_B;  4'd1: ch = C_A;  4'd2: ch = C_T;
@@ -228,16 +187,11 @@ module hud #(
     wire [4:0] gbits;
     font5x7 u_font(.ch(ch), .row(gry), .bits(gbits));
 
-    // 像素落在字形上？(col 0..9 且行 0..13 且该位是 1)
-    // 字模 5 列放大 2 倍 = 10 像素宽，所以【两个像素共用一位】：列号要 >>1
-    // （行方向同理，gry = gy0[3:1]）。只写 4-col 会把字形横向压扁成乱码。
     wire [2:0] gcol = 3'd4 - col[3:1];       // col 0..9 -> 字模列 0..4
     wire       text_px = in_text && (li != 4'hF) && (col < 4'd10)
                          && (gy0 < 11'd14) && gbits[gcol];
 
-    // ================= 3. 敌人图标：N_E 个 20x20 的格子 =================
-    //   位置：面板内 x = 12 + i*28，y = 100..119；和场上坦克同一张贴图，
-    //   朝下（正好对着玩区里的玩家方向），一眼能看出还剩几个、什么兵种。
+    // 控制敌人图标
     wire [10:0] iy = y - 11'd100;
     wire        icon_row = (y >= 11'd100) && (y < 11'd120);
     wire [N_E-1:0]   icon_hit;
@@ -247,7 +201,6 @@ module hud #(
         for (gi = 0; gi < N_E; gi = gi + 1) begin : g_icon
             wire [10:0] ix = px - (11'd12 + gi * 11'd28);
             assign icon_hit[gi] = icon_row && (ix < 11'd20) && enemy_valid[gi];
-            // 朝下的坦克（和 vga.v 里 tank_addr 的 2'b01 分支一致）：399 - py*20 - px
             wire [8:0] row20 = ({4'b0, iy[4:0]} << 4) + ({4'b0, iy[4:0]} << 2);
             assign icon_a[gi*9 +: 9] = 9'd399 - row20 - {4'b0, ix[4:0]};
         end
@@ -272,36 +225,30 @@ module hud #(
     assign icon_addr = icon_addr_r;
     assign icon_type = icon_type_r;
 
-    // ================= 4. 颜色 =================
-    // 闪烁：50MHz / 2^25 ≈ 1.5Hz，结算横幅共用这个节拍
     reg [24:0] blink_cnt = 25'd0;
     always @(posedge clock) blink_cnt <= blink_cnt + 25'd1;
     wire blink = blink_cnt[24];
 
-    // 结算横幅的底色只在真的结算（GAME OVER / STAGE CLEAR）时画。
-    // 以前少了 (game_over || victory)，游戏进行中每 1.5s 也会闪一条
-    // 200px 宽、14px 高的纯绿带（板子上肉眼可见）。
     wire banner_on = (y >= 11'd300) && (y < 11'd314);
     wire banner_bg = banner_on && (game_over || victory) && blink;
 
-    // 颜色（12 位）：标题黄、标签浅蓝、数值白
     reg [11:0] text_color;
     always @(*) begin
         case (li)
-            4'd0:       text_color = 12'hFE0;   // 标题：黄
-            4'd4, 4'd6: text_color = 12'hFFF;   // 数值：白
-            4'd8, 4'd9: text_color = 12'hFFF;   // 横幅文字：白
-            4'd10:      text_color = blink ? 12'hFE0 : 12'h888;  // 重开提示：闪
-            4'd7:       text_color = 12'h789;   // 底部提示：暗
-            default:    text_color = 12'hADF;   // 标签：浅蓝
+            4'd0:       text_color = 12'hFE0; 
+            4'd4, 4'd6: text_color = 12'hFFF;  
+            4'd8, 4'd9: text_color = 12'hFFF;
+            4'd10:      text_color = blink ? 12'hFE0 : 12'h888;
+            4'd7:       text_color = 12'h789; 
+            default:    text_color = 12'hADF; 
         endcase
     end
 
     always @(*) begin
-        rgb = 12'h113;                       // 面板底色（深蓝黑）
-        if (px < 11'd2)  rgb = 12'h8CF;      // 左侧 2px 分界线
+        rgb = 12'h113;                
+        if (px < 11'd2)  rgb = 12'h8CF;    
         if (banner_bg)   rgb = game_over ? 12'hB11 : 12'h1B1;
-        if (text_px)     rgb = text_color;   // 文字压在所有底色之上
+        if (text_px)     rgb = text_color;  
     end
 
 endmodule

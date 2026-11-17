@@ -1,19 +1,4 @@
 `timescale 1ns / 1ps
-// ============================================================================
-//  font5x7 —— HUD 用的 5x7 点阵字库（纯组合，一个字符查一次）
-//
-//  【本文件由 pysrc/gen_font.py 生成，不要手改】
-//    字形数据在 pysrc/font5x7.py（唯一数据源，img/preview.py 也 import 它），
-//    改完字形跑一遍：python pysrc\gen_font.py
-//
-//  为什么不做成 BRAM ROM：
-//    只有 42 个字形，用 case 表综合出来约一百多个 LUT（本设计 LUT 用量 <10%），
-//    却省掉了“新建 IP + 生成 coe + 仿真桩 + check_mif 期望值”一整套东西。
-//    HUD 是纯静态文字，没有任何带宽需求，用 BRAM 反而是浪费。
-//
-//  接口：ch 是 ASCII 码，row 是 0..6（上 -> 下），
-//        bits[4] 是最左边那一列，bits[0] 是最右边那一列。
-// ============================================================================
 module font5x7 (
     input      [7:0] ch,
     input      [2:0] row,
@@ -69,7 +54,6 @@ module font5x7 (
         endcase
     end
 
-    // 变量下标的位选（Verilog-2001 的 +: 语法），综合成 3 级 mux
     always @(*) bits = g[row*5 +: 5];
 
 endmodule
