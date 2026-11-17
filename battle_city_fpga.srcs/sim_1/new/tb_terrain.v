@@ -17,9 +17,10 @@
 //
 // 【几何常量】600x600 玩区 = 120x120 格；改玩区尺寸时只需要改这一小段
 // 地图契约（map_generator.py 校验的同一套）：
-//       基地本体 : 列 58~61 x 行 113~116（= vga.v 里 20x20 金鹰精灵的包围盒，
-//                  HQ_X0/HQ_Y0 = 290/565；H 块其余格子由展开器补成砖，
-//                  所以砖墙是紧贴着基地的）
+//       基地本体 : 列 58~61 x 行 116~119（= vga.v 里 20x20 金鹰精灵的包围盒，
+//                  HQ_X0/HQ_Y0 = 290/580；贴着 600px 的底边）。
+//                  外面套一圈 2 格（10px）厚的砖墙（上/左/右），环以外由展开器
+//                  留空 —— 原版 Battle City 的“薄砖围一圈”
 //   玩家出生 : (200,560) 格 (40,112) —— 基地左边一块、贴着底边（原版 1P 位置）
 //              车身上下 ±60px（下方到画面底边为止）和往右到堡垒墙的横走廊必须空
 //   敌人出生 : (40,0)/(300,0)/(560,0) 及其正下方 20px 必须空
@@ -40,8 +41,8 @@ module tb_terrain;
     localparam COMB_X  = 300;
     localparam COMB_Y  = 300;
     localparam HQ_CX   = 58;           // 基地本体左上角（格）= 鹰的 20x20 包围盒
-    localparam HQ_CY   = 113;
-    localparam HQ_W    = 4;            // 4x4 格 = 20x20 像素（vga.v 的 HQ_X0/HQ_Y0 = 290/565）
+    localparam HQ_CY   = 116;          // 贴着 600px 的底边（HQ_CY + 4 = 120）
+    localparam HQ_W    = 4;            // 4x4 格 = 20x20 像素（vga.v 的 HQ_X0/HQ_Y0 = 290/580）
     localparam HQ_H    = 4;
     localparam ENEMY_X0 = 40;          // 三个敌人出生点（像素）
     localparam ENEMY_X1 = 300;
@@ -188,6 +189,20 @@ module tb_terrain;
             end
         end
     endtask
+
+    task check_num;
+        input [8*44-1:0] name;
+        input [15:0]     got;
+        input [15:0]     exp;
+        begin
+            if (got !== exp) begin
+                errors = errors + 1;
+                $display("[FAIL] %0s : got %0d, expected %0d", name, got, exp);
+            end else begin
+                $display("[ OK ] %0s : %0d", name, got);
+            end
+        end
+    endtask
     initial begin
         $display("=========== terrain collision test ===========");
 
@@ -202,13 +217,13 @@ module tb_terrain;
                      u_top.player_terrain_in_front);
         end
 
-        // ---- T15：真地图契约 —— 基地本体必须正好是 列 58~61 x 行 113~116 ----
-        // vga.v 画基地精灵用的是 HQ_X0/HQ_Y0 = 290/565（20x20 精灵 = 4x4 格），
+        // ---- T15：真地图契约 —— 基地本体必须正好是 列 58~61 x 行 116~119 ----
+        // vga.v 画基地精灵用的是 HQ_X0/HQ_Y0 = 290/580（20x20 精灵 = 4x4 格），
         // map_generator.py 就必须把 tile 5 铺在同一块 4x4 格上 —— 两者严丝合缝，
-        // 鹰占不到的格子才有砖补上（不会有"砖墙中间挖个黑坑"）。
+        // 而且这块贴着 600px 的底边（行 120 就是边界）。
         // 一旦错开，板上就会变成"鹰画在砖墙上"或者"炮弹打不掉基地"。
         begin : hq_contract
-            integer hx, hy, hq_bad, stray_bad, shell_bad;
+            integer hx, hy, hq_bad, stray_bad, shell_bad, open_bad;
             begin
                 hq_bad = 0;
                 for (hy = HQ_CY; hy < HQ_CY + HQ_H; hy = hy + 1)
@@ -234,27 +249,46 @@ module tb_terrain;
                 end else
                     $display("[ OK ] T15b no tile 5 outside the HQ box");
 
-                // T15c：基地左/上/右各 1 格必须是砖/钢（经典 U 型堡垒，正面敞开）。
+                // T15c：基地上/左/右各 2 格必须是砖/钢（原版那种“薄砖围一圈”）。
                 // 这就是地图生成时 map_generator.validate() 的第 1b 条，在 RTL 侧
                 // 再验一遍：只要外墙漏一格，坦克就能从侧面贴到基地。
-                // 下方（HQ_CY + HQ_H 那一行）不查 —— 正面敞开让鹰完整可见，
-                // 而且基地贴着地图底边，坦克永远站不到基地下面。
+                // 环厚 2 格 = 10px = 鹰宽的一半（原版比例）；下方不查 ——
+                // 基地贴着地图底边（HQ_CY + HQ_H = 120），坦克永远站不到下面。
                 shell_bad = 0;
-                for (hx = HQ_CX - 1; hx <= HQ_CX + HQ_W; hx = hx + 1) begin
+                for (hx = HQ_CX - 2; hx < HQ_CX + HQ_W + 2; hx = hx + 1) begin
                     if (u_top.u_map_ram.mem[A(hx, HQ_CY - 1)] !== 4'd1 &&
                         u_top.u_map_ram.mem[A(hx, HQ_CY - 1)] !== 4'd2) shell_bad = shell_bad + 1;
+                    if (u_top.u_map_ram.mem[A(hx, HQ_CY - 2)] !== 4'd1 &&
+                        u_top.u_map_ram.mem[A(hx, HQ_CY - 2)] !== 4'd2) shell_bad = shell_bad + 1;
                 end
                 for (hy = HQ_CY; hy < HQ_CY + HQ_H; hy = hy + 1) begin
                     if (u_top.u_map_ram.mem[A(HQ_CX - 1, hy)] !== 4'd1 &&
                         u_top.u_map_ram.mem[A(HQ_CX - 1, hy)] !== 4'd2) shell_bad = shell_bad + 1;
+                    if (u_top.u_map_ram.mem[A(HQ_CX - 2, hy)] !== 4'd1 &&
+                        u_top.u_map_ram.mem[A(HQ_CX - 2, hy)] !== 4'd2) shell_bad = shell_bad + 1;
                     if (u_top.u_map_ram.mem[A(HQ_CX + HQ_W, hy)] !== 4'd1 &&
                         u_top.u_map_ram.mem[A(HQ_CX + HQ_W, hy)] !== 4'd2) shell_bad = shell_bad + 1;
+                    if (u_top.u_map_ram.mem[A(HQ_CX + HQ_W + 1, hy)] !== 4'd1 &&
+                        u_top.u_map_ram.mem[A(HQ_CX + HQ_W + 1, hy)] !== 4'd2) shell_bad = shell_bad + 1;
                 end
                 if (shell_bad != 0) begin
                     errors = errors + 1;
                     $display("[FAIL] T15c %0d HQ shell cells are not brick/steel", shell_bad);
                 end else
-                    $display("[ OK ] T15c HQ shell is brick on left/top/right (front open)");
+                    $display("[ OK ] T15c HQ shell is 2-cell thick on left/top/right");
+
+                // T15d：环外面（'H' 块剩下的那两行）必须是空地 ——
+                // 不然基地又会变成“一大块砖中间挖个洞”，和原版的薄砖墙不一样。
+                open_bad = 0;
+                for (hx = HQ_CX - 2; hx < HQ_CX + HQ_W + 2; hx = hx + 1) begin
+                    if (u_top.u_map_ram.mem[A(hx, HQ_CY - 3)] !== 4'd0) open_bad = open_bad + 1;
+                    if (u_top.u_map_ram.mem[A(hx, HQ_CY - 4)] !== 4'd0) open_bad = open_bad + 1;
+                end
+                if (open_bad != 0) begin
+                    errors = errors + 1;
+                    $display("[FAIL] T15d %0d cells right above the HQ ring are not empty", open_bad);
+                end else
+                    $display("[ OK ] T15d cells right above the HQ ring are empty");
             end
         end
 
@@ -304,6 +338,33 @@ module tb_terrain;
             end
         end
 
+        // ---- T17：VGA 的“地图地址”和“鹰窗口”必须重合（这次地图层错位 bug 的回归）----
+        // 像素 (295,585)：col = 295/5 = 59、row = 585/5 = 117
+        //   map_addr 必须是 117*120 + 59 = 14099
+        //   该格必须是 tile 5（基地本体）
+        //   hq_on 必须为 1（hq_dx = 295-290 = 5，hq_dy = 585-580 = 5）
+        // 反过来：环左下角外面一格 (280,570) 的 hq_on 必须是 0。
+        // hcount/vcount 是 vga_clk 域的计数器，必须 force 住（否则 always 立刻改写）。
+        begin : vga_align
+            begin
+                force u_top.u_vga.hcount = 11'd184 + 11'd295;   // H_DAT_BEGIN + 295
+                force u_top.u_vga.vcount = 11'd29  + 11'd585;   // V_DAT_BEGIN + 585
+                repeat (4) @(posedge u_top.u_vga.vga_clk);
+                check_num("T17a map_addr @ pixel(295,585)", u_top.u_vga.map_addr, 16'd14099);
+                check_num("T17b tile at base window is 5",
+                          {12'd0, u_top.u_vga.tile_id}, 16'd5);
+                check_num("T17c hq_on at eagle centre",
+                          {15'd0, u_top.u_vga.hq_on}, 16'd1);
+                force u_top.u_vga.hcount = 11'd184 + 11'd280;
+                force u_top.u_vga.vcount = 11'd29  + 11'd570;
+                repeat (4) @(posedge u_top.u_vga.vga_clk);
+                check_num("T17d hq_off outside the ring",
+                          {15'd0, u_top.u_vga.hq_on}, 16'd0);
+                release u_top.u_vga.hcount;
+                release u_top.u_vga.vcount;
+            end
+        end
+
         // ---- 出生点四方向：这就是“空气墙”bug 的回归测试 ----
         do_reset;                                  // 出生点 (200,560)
         btn_up = 1'b1;    step_ticks(10); btn_up = 1'b0;
@@ -337,13 +398,12 @@ module tb_terrain;
         btn_up = 1'b1;    step_ticks(10); btn_up = 1'b0;
         check_pos("T07 up across river ford", 10'd100, 10'd190);
 
-        // ---- T13：真地图的基地小圈墙挡路（薄砖顶在块行 27 = 格行 108~111，只盖
-        //            块 14~15 = 鹰的正上方；两侧和正面都敞开）----
-        // (300,480) 一路向下：行 26 是空地可以走，走到 y=520 时正前方是行 108 的
-        // 薄砖顶（块 14~15 正好在坦克那几列上），停住。
+        // ---- T13：真地图的基地薄砖墙挡路（环在格行 114~115，块 14~15 正对鹰的上方）----
+        // (300,480) 一路向下：前面几十像素是空地（堡垒正上方特意留空），
+        // 走到 y=550 时正前方是行 114 的砖（薄砖环的顶），停住。
         do_reset; place_tank(10'd300, 10'd480);
-        btn_down = 1'b1;  step_ticks(50); btn_down = 1'b0;
-        check_pos("T13 down blocked by base roof", 10'd300, 10'd520);
+        btn_down = 1'b1;  step_ticks(80); btn_down = 1'b0;
+        check_pos("T13 down blocked by base ring", 10'd300, 10'd550);
 
         // ================= 以下用例先把地图清零，只测碰撞逻辑 =================
         // poke 的地址 = A(列, 行)。这些用例不测出生点，统一把坦克摆到 (300,300)：

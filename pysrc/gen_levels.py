@@ -54,9 +54,10 @@ def find_levels(explicit=None):
 def expand_cells(blocks):
     """硬件展开规则的 Python 版（和 level_loader.v 逐格对应）：
        块 -> 4x4 格，tile_id 直接抄；'H' 块（5）里落在基地矩形内的格子是 5，
-       矩形上/左/右是 1（砖，U 型堡垒的墙），矩形下方留空（0）——
-       经典样式：鹰完整可见，不埋在整块砖里。"""
+       矩形外是 2 格（10px）厚的砖环（上/左/右三面），环以外留空（0）——
+       原版 Battle City 的“薄砖围一圈”：基地贴底、三面薄墙、环外全空。"""
     hx, hy, hw, hh = HW_HQ
+    sh = mg.HQ_SHELL
     cells = [[0] * mg.MAP_COLS for _ in range(mg.MAP_ROWS)]
     for by in range(mg.BROWS):
         for bx in range(mg.BCOLS):
@@ -66,11 +67,13 @@ def expand_cells(blocks):
                     gx, gy = bx * 4 + cx, by * 4 + cy
                     if t == 5:
                         inside = (hx <= gx < hx + hw) and (hy <= gy < hy + hh)
+                        shell = (hx - sh <= gx < hx + hw + sh and
+                                 hy - sh <= gy < hy + hh and not inside)
                         if inside:
                             cells[gy][gx] = 5
-                        elif gy < hy + hh:        # 上/左/右：砖墙
+                        elif shell:
                             cells[gy][gx] = 1
-                        # gy >= hy + hh：正面敞开，留空
+                        # 环以外：留空
                     else:
                         cells[gy][gx] = t
     return cells

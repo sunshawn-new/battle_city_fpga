@@ -1,7 +1,7 @@
 Copyright 1986-2021 Xilinx, Inc. All Rights Reserved.
 ------------------------------------------------------------------------------------
 | Tool Version : Vivado v.2021.1 (win64) Build 3247384 Thu Jun 10 19:36:33 MDT 2021
-| Date         : Mon Nov 16 19:17:17 2026
+| Date         : Tue Nov 17 09:58:44 2026
 | Host         : LAPTOP-8QJD8CCP running 64-bit major release  (build 9200)
 | Command      : report_control_sets -verbose -file top_control_sets_placed.rpt
 | Design       : top
@@ -23,11 +23,11 @@ Table of Contents
 +----------------------------------------------------------+-------+
 |                          Status                          | Count |
 +----------------------------------------------------------+-------+
-| Total control sets                                       |   100 |
-|    Minimum number of control sets                        |   100 |
+| Total control sets                                       |    99 |
+|    Minimum number of control sets                        |    99 |
 |    Addition due to synthesis replication                 |     0 |
 |    Addition due to physical synthesis replication        |     0 |
-| Unused register locations in slices containing registers |   298 |
+| Unused register locations in slices containing registers |   281 |
 +----------------------------------------------------------+-------+
 * Control sets can be merged at opt_design using control_set_merge or merge_equivalent_drivers
 ** Run report_qor_suggestions for automated merging and remapping suggestions
@@ -39,14 +39,14 @@ Table of Contents
 +--------------------+-------+
 |       Fanout       | Count |
 +--------------------+-------+
-| Total control sets |   100 |
-| >= 0 to < 4        |     5 |
+| Total control sets |    99 |
+| >= 0 to < 4        |     4 |
 | >= 4 to < 6        |    15 |
 | >= 6 to < 8        |     7 |
 | >= 8 to < 10       |     5 |
-| >= 10 to < 12      |    18 |
-| >= 12 to < 14      |     4 |
-| >= 14 to < 16      |     7 |
+| >= 10 to < 12      |    16 |
+| >= 12 to < 14      |     5 |
+| >= 14 to < 16      |     8 |
 | >= 16              |    39 |
 +--------------------+-------+
 * Control sets can be remapped at either synth_design or opt_design
@@ -58,12 +58,12 @@ Table of Contents
 +--------------+-----------------------+------------------------+-----------------+--------------+
 | Clock Enable | Synchronous Set/Reset | Asynchronous Set/Reset | Total Registers | Total Slices |
 +--------------+-----------------------+------------------------+-----------------+--------------+
-| No           | No                    | No                     |             443 |          192 |
+| No           | No                    | No                     |             443 |          198 |
 | No           | No                    | Yes                    |               0 |            0 |
-| No           | Yes                   | No                     |             293 |          120 |
-| Yes          | No                    | No                     |              50 |           18 |
+| No           | Yes                   | No                     |             295 |          122 |
+| Yes          | No                    | No                     |              51 |           19 |
 | Yes          | No                    | Yes                    |               0 |            0 |
-| Yes          | Yes                   | No                     |            1036 |          434 |
+| Yes          | Yes                   | No                     |            1042 |          454 |
 +--------------+-----------------------+------------------------+-----------------+--------------+
 
 
@@ -73,106 +73,105 @@ Table of Contents
 +------------------+------------------------------------------------------+----------------------------------------+------------------+----------------+--------------+
 |   Clock Signal   |                     Enable Signal                    |            Set/Reset Signal            | Slice Load Count | Bel Load Count | Bels / Slice |
 +------------------+------------------------------------------------------+----------------------------------------+------------------+----------------+--------------+
-|  clock_IBUF_BUFG | u_stage_ctrl/state_reg[1]_2[0]                       | u_stage_ctrl/state_reg[1]_1            |                1 |              1 |         1.00 |
-|  clock_IBUF_BUFG | g_enemy_probe[2].u_probe/front_terrain[1]_i_1__1_n_0 | u_stage_ctrl/probe_rst                 |                1 |              2 |         2.00 |
 |  clock_IBUF_BUFG | u_probe/front_terrain[1]_i_1__2_n_0                  | u_stage_ctrl/probe_rst                 |                1 |              2 |         2.00 |
 |  clock_IBUF_BUFG | g_enemy_probe[1].u_probe/front_terrain[1]_i_1__0_n_0 | u_stage_ctrl/probe_rst                 |                1 |              2 |         2.00 |
-|  clock_IBUF_BUFG | g_enemy_probe[0].u_probe/front_terrain[1]_i_1_n_0    | u_stage_ctrl/probe_rst                 |                1 |              2 |         2.00 |
-|  clock_IBUF_BUFG | u_bullet_ctrl/own[3][1]_i_1_n_0                      | u_stage_ctrl/probe_rst                 |                3 |              4 |         1.33 |
-|  clock_IBUF_BUFG | u_map_bus/owner[7]_i_1_n_0                           |                                        |                2 |              4 |         2.00 |
-|  clock_IBUF_BUFG | u_level_loader/cc[3]_i_1_n_0                         | reset_IBUF                             |                2 |              4 |         2.00 |
-|  clock_IBUF_BUFG | u_bullet_ctrl/chk_state[3]_i_1_n_0                   | u_stage_ctrl/probe_rst                 |                4 |              4 |         1.00 |
+|  clock_IBUF_BUFG | g_enemy_probe[0].u_probe/front_terrain[1]_i_1_n_0    | u_stage_ctrl/probe_rst                 |                2 |              2 |         1.00 |
+|  clock_IBUF_BUFG | g_enemy_probe[2].u_probe/front_terrain[1]_i_1__1_n_0 | u_stage_ctrl/probe_rst                 |                1 |              2 |         2.00 |
+|  clock_IBUF_BUFG | u_bullet_ctrl/chk_state[3]_i_1_n_0                   | u_stage_ctrl/probe_rst                 |                3 |              4 |         1.33 |
+|  clock_IBUF_BUFG | u_fx_ctrl/g_fx[2].ph                                 | u_fx_ctrl/g_fx[2].ph[3]_i_1_n_0        |                2 |              4 |         2.00 |
 |  clock_IBUF_BUFG | u_bullet_ctrl/dir                                    | u_stage_ctrl/probe_rst                 |                3 |              4 |         1.33 |
 |  clock_IBUF_BUFG | u_level_loader/blk                                   | reset_IBUF                             |                1 |              4 |         4.00 |
-|  clock_IBUF_BUFG | u_enemy_ctrl/g_enemy[2].kill_req_reg_0[0]            | u_fx_ctrl/p_1_in0                      |                2 |              4 |         2.00 |
-|  clock_IBUF_BUFG | u_bullet_ctrl/own[1][1]_i_1_n_0                      | u_stage_ctrl/probe_rst                 |                3 |              4 |         1.33 |
-|  clock_IBUF_BUFG | u_bullet_ctrl/own[2][1]_i_1_n_0                      | u_stage_ctrl/probe_rst                 |                3 |              4 |         1.33 |
-|  clock_IBUF_BUFG | u_fx_ctrl/g_fx[0].ph                                 | u_fx_ctrl/g_fx[0].ph[3]_i_1_n_0        |                1 |              4 |         4.00 |
+|  clock_IBUF_BUFG | u_level_loader/cc[3]_i_1_n_0                         | reset_IBUF                             |                1 |              4 |         4.00 |
+|  clock_IBUF_BUFG | u_fx_ctrl/g_fx[0].ph                                 | u_fx_ctrl/g_fx[0].ph[3]_i_1_n_0        |                2 |              4 |         2.00 |
+|  clock_IBUF_BUFG | u_map_bus/owner[7]_i_1_n_0                           |                                        |                2 |              4 |         2.00 |
+|  clock_IBUF_BUFG | u_bullet_ctrl/own[1][1]_i_1_n_0                      | u_stage_ctrl/probe_rst                 |                2 |              4 |         2.00 |
+|  clock_IBUF_BUFG | u_bullet_ctrl/own[3][1]_i_1_n_0                      | u_stage_ctrl/probe_rst                 |                2 |              4 |         2.00 |
+|  clock_IBUF_BUFG | u_bullet_ctrl/own[2][1]_i_1_n_0                      | u_stage_ctrl/probe_rst                 |                1 |              4 |         4.00 |
 |  clock_IBUF_BUFG | u_fx_ctrl/g_fx[1].ph                                 | u_fx_ctrl/g_fx[1].ph[3]_i_1_n_0        |                1 |              4 |         4.00 |
-|  clock_IBUF_BUFG | u_fx_ctrl/g_fx[2].ph                                 | u_fx_ctrl/g_fx[2].ph[3]_i_1_n_0        |                2 |              4 |         2.00 |
-|  clock_IBUF_BUFG | u_fx_ctrl/g_fx[3].ph                                 | u_fx_ctrl/g_fx[3].ph[3]_i_1_n_0        |                2 |              4 |         2.00 |
-|  clock_IBUF_BUFG | u_level_loader/by[4]_i_1_n_0                         | reset_IBUF                             |                1 |              5 |         5.00 |
-|  clock_IBUF_BUFG | u_player/move_tick_c                                 | u_stage_ctrl/SR[0]                     |                4 |              5 |         1.25 |
-|  clock_IBUF_BUFG | g_enemy_probe[2].u_probe/scan_cell[2]_i_1__1_n_0     | u_stage_ctrl/probe_rst                 |                4 |              6 |         1.50 |
+|  clock_IBUF_BUFG | u_fx_ctrl/g_fx[3].ph                                 | u_fx_ctrl/g_fx[3].ph[3]_i_1_n_0        |                1 |              4 |         4.00 |
+|  clock_IBUF_BUFG | u_enemy_ctrl/g_enemy[2].kill_req_reg_0[0]            | u_fx_ctrl/p_1_in0                      |                2 |              4 |         2.00 |
+|  clock_IBUF_BUFG | u_level_loader/by[4]_i_1_n_0                         | reset_IBUF                             |                2 |              5 |         2.50 |
+|  clock_IBUF_BUFG | u_player/move_tick_c                                 | u_stage_ctrl/SR[0]                     |                5 |              5 |         1.00 |
+|  clock_IBUF_BUFG | u_probe/scan_cell[2]_i_1__2_n_0                      | u_stage_ctrl/probe_rst                 |                4 |              6 |         1.50 |
+|  clock_IBUF_BUFG | g_enemy_probe[1].u_probe/scan_cell[2]_i_1__0_n_0     | u_stage_ctrl/probe_rst                 |                3 |              6 |         2.00 |
 |  clock_IBUF_BUFG | g_enemy_probe[0].u_probe/scan_cell[2]_i_1_n_0        | u_stage_ctrl/probe_rst                 |                4 |              6 |         1.50 |
-|  clock_IBUF_BUFG | u_probe/scan_cell[2]_i_1__2_n_0                      | u_stage_ctrl/probe_rst                 |                3 |              6 |         2.00 |
-|  clock_IBUF_BUFG | g_enemy_probe[1].u_probe/scan_cell[2]_i_1__0_n_0     | u_stage_ctrl/probe_rst                 |                4 |              6 |         1.50 |
-|  clock_IBUF_BUFG |                                                      | u_stage_ctrl/g_enemy[2].fire_period    |                5 |              7 |         1.40 |
-|  clock_IBUF_BUFG |                                                      | u_stage_ctrl/g_enemy[0].fire_period    |                7 |              7 |         1.00 |
-|  clock_IBUF_BUFG |                                                      | u_stage_ctrl/g_enemy[1].fire_period    |                6 |              7 |         1.17 |
-|  clock_IBUF_BUFG | u_enemy_ctrl/g_enemy[0].tick                         | u_stage_ctrl/g_enemy[0].fire_period    |                6 |              8 |         1.33 |
-|  clock_IBUF_BUFG | u_enemy_ctrl/g_enemy[1].tick                         | u_stage_ctrl/g_enemy[1].fire_period    |                7 |              8 |         1.14 |
-|  clock_IBUF_BUFG | u_bullet_ctrl/chk_idx                                | u_stage_ctrl/probe_rst                 |                5 |              8 |         1.60 |
-|  clock_IBUF_BUFG | u_enemy_ctrl/g_enemy[2].tick                         | u_stage_ctrl/g_enemy[2].fire_period    |                5 |              8 |         1.60 |
+|  clock_IBUF_BUFG | g_enemy_probe[2].u_probe/scan_cell[2]_i_1__1_n_0     | u_stage_ctrl/probe_rst                 |                3 |              6 |         2.00 |
+|  clock_IBUF_BUFG |                                                      | u_stage_ctrl/g_enemy[2].fire_period    |                6 |              7 |         1.17 |
+|  clock_IBUF_BUFG |                                                      | u_stage_ctrl/g_enemy[0].fire_period    |                6 |              7 |         1.17 |
+|  clock_IBUF_BUFG |                                                      | u_stage_ctrl/g_enemy[1].fire_period    |                5 |              7 |         1.40 |
 |  clock_IBUF_BUFG | u_bullet_ctrl/kill_slot[7]_i_1_n_0                   | u_stage_ctrl/probe_rst                 |                2 |              8 |         4.00 |
-|  clock_IBUF_BUFG | u_bullet_ctrl/y[1][9]_i_1_n_0                        | u_stage_ctrl/probe_rst                 |                5 |             10 |         2.00 |
-|  clock_IBUF_BUFG | u_bullet_ctrl/y[2][9]_i_1_n_0                        | u_stage_ctrl/probe_rst                 |                4 |             10 |         2.50 |
-|  clock_IBUF_BUFG | u_enemy_ctrl/g_enemy[0].x                            | u_stage_ctrl/g_enemy[0].fire_period    |                4 |             10 |         2.50 |
-|  clock_IBUF_BUFG | u_bullet_ctrl/y[0][9]_i_1_n_0                        | u_stage_ctrl/probe_rst                 |                4 |             10 |         2.50 |
-|  clock_IBUF_BUFG | u_enemy_ctrl/g_enemy[1].x                            | u_stage_ctrl/g_enemy[1].fire_period    |                6 |             10 |         1.67 |
-|  clock_IBUF_BUFG | u_enemy_ctrl/g_enemy[2].x                            | u_stage_ctrl/g_enemy[2].fire_period    |                6 |             10 |         1.67 |
-|  clock_IBUF_BUFG | u_enemy_ctrl/E[0]                                    | u_stage_ctrl/g_enemy[0].fire_period    |                7 |             10 |         1.43 |
-|  clock_IBUF_BUFG | u_bullet_ctrl/x[2][9]_i_1_n_0                        | u_stage_ctrl/probe_rst                 |                5 |             10 |         2.00 |
-|  clock_IBUF_BUFG | u_enemy_ctrl/g_enemy[1].dir_reg[0]_2[0]              | u_stage_ctrl/g_enemy[1].fire_period    |                6 |             10 |         1.67 |
-|  clock_IBUF_BUFG | u_bullet_ctrl/x[1][9]_i_1_n_0                        | u_stage_ctrl/probe_rst                 |                5 |             10 |         2.00 |
-|  clock_IBUF_BUFG | u_bullet_ctrl/x[0][9]_i_1_n_0                        | u_stage_ctrl/probe_rst                 |                7 |             10 |         1.43 |
-|  clock_IBUF_BUFG | u_enemy_ctrl/g_enemy[2].dir_reg[0]_2[0]              | u_stage_ctrl/g_enemy[2].fire_period    |                6 |             10 |         1.67 |
-|  clock_IBUF_BUFG | u_player/position_y[9]_i_1_n_0                       | u_stage_ctrl/SR[0]                     |                4 |             10 |         2.50 |
-|  clock_IBUF_BUFG | u_bullet_ctrl/y[3][9]_i_1_n_0                        | u_stage_ctrl/probe_rst                 |                4 |             10 |         2.50 |
-|  clock_IBUF_BUFG | u_bullet_ctrl/x[3][9]_i_1_n_0                        | u_stage_ctrl/probe_rst                 |                7 |             10 |         1.43 |
-|  vga_clk_BUFG    | u_vga/vcount                                         |                                        |                3 |             11 |         3.67 |
+|  clock_IBUF_BUFG | u_enemy_ctrl/g_enemy[2].tick                         | u_stage_ctrl/g_enemy[2].fire_period    |                8 |              8 |         1.00 |
+|  clock_IBUF_BUFG | u_enemy_ctrl/g_enemy[1].tick                         | u_stage_ctrl/g_enemy[1].fire_period    |                6 |              8 |         1.33 |
+|  clock_IBUF_BUFG | u_enemy_ctrl/g_enemy[0].tick                         | u_stage_ctrl/g_enemy[0].fire_period    |                5 |              8 |         1.60 |
+|  clock_IBUF_BUFG | u_bullet_ctrl/chk_idx                                | u_stage_ctrl/probe_rst                 |                5 |              8 |         1.60 |
+|  clock_IBUF_BUFG | u_enemy_ctrl/g_enemy[0].x                            | u_stage_ctrl/g_enemy[0].fire_period    |                5 |             10 |         2.00 |
+|  clock_IBUF_BUFG | u_bullet_ctrl/x[1][9]_i_1_n_0                        | u_stage_ctrl/probe_rst                 |                4 |             10 |         2.50 |
+|  clock_IBUF_BUFG | u_enemy_ctrl/E[0]                                    | u_stage_ctrl/g_enemy[0].fire_period    |                6 |             10 |         1.67 |
+|  clock_IBUF_BUFG | u_enemy_ctrl/g_enemy[1].dir_reg[1]_5[0]              | u_stage_ctrl/g_enemy[1].fire_period    |                8 |             10 |         1.25 |
+|  clock_IBUF_BUFG | u_enemy_ctrl/g_enemy[2].dir_reg[1]_5[0]              | u_stage_ctrl/g_enemy[2].fire_period    |                8 |             10 |         1.25 |
+|  clock_IBUF_BUFG | u_bullet_ctrl/x[0][9]_i_1_n_0                        | u_stage_ctrl/probe_rst                 |                6 |             10 |         1.67 |
+|  clock_IBUF_BUFG | u_bullet_ctrl/x[2][9]_i_1_n_0                        | u_stage_ctrl/probe_rst                 |                4 |             10 |         2.50 |
+|  clock_IBUF_BUFG | u_bullet_ctrl/x[3][9]_i_1_n_0                        | u_stage_ctrl/probe_rst                 |                6 |             10 |         1.67 |
+|  clock_IBUF_BUFG | u_bullet_ctrl/y[2][9]_i_1_n_0                        | u_stage_ctrl/probe_rst                 |                6 |             10 |         1.67 |
+|  clock_IBUF_BUFG | u_bullet_ctrl/y[1][9]_i_1_n_0                        | u_stage_ctrl/probe_rst                 |                8 |             10 |         1.25 |
+|  clock_IBUF_BUFG | u_bullet_ctrl/y[3][9]_i_1_n_0                        | u_stage_ctrl/probe_rst                 |                8 |             10 |         1.25 |
+|  clock_IBUF_BUFG | u_enemy_ctrl/g_enemy[2].x                            | u_stage_ctrl/g_enemy[2].fire_period    |                7 |             10 |         1.43 |
+|  clock_IBUF_BUFG | u_player/position_x[9]_i_1_n_0                       | u_stage_ctrl/SR[0]                     |                4 |             10 |         2.50 |
+|  clock_IBUF_BUFG | u_bullet_ctrl/y[0][9]_i_1_n_0                        | u_stage_ctrl/probe_rst                 |                7 |             10 |         1.43 |
 |  clock_IBUF_BUFG | u_bullet_ctrl/cool_cnt[25]_i_2_n_0                   | u_bullet_ctrl/cool_cnt[25]_i_1_n_0     |                6 |             11 |         1.83 |
-|  clock_IBUF_BUFG | u_stage_ctrl/state_reg[1]_2[0]                       |                                        |                5 |             11 |         2.20 |
-|  clock_IBUF_BUFG | u_stage_ctrl/state_reg[1]_3[0]                       |                                        |                4 |             12 |         3.00 |
-|  clock_IBUF_BUFG | u_stage_ctrl/remaining[5]_i_1_n_0                    | u_stage_ctrl/state0                    |                4 |             12 |         3.00 |
-|  clock_IBUF_BUFG | u_stage_ctrl/state_reg[1]_0[0]                       |                                        |                4 |             12 |         3.00 |
-|  clock_IBUF_BUFG | u_bullet_ctrl/lives_reg[1]_1                         | u_fx_ctrl/p_1_in0                      |                7 |             13 |         1.86 |
+|  vga_clk_BUFG    | u_vga/vcount                                         |                                        |                4 |             11 |         2.75 |
+|  clock_IBUF_BUFG | u_stage_ctrl/remaining[5]_i_1_n_0                    | u_stage_ctrl/state0                    |                5 |             12 |         2.40 |
+|  clock_IBUF_BUFG | u_stage_ctrl/state_reg[1]_0[0]                       |                                        |                5 |             12 |         2.40 |
+|  clock_IBUF_BUFG | u_stage_ctrl/state_reg[1]_1[0]                       |                                        |                4 |             12 |         3.00 |
+|  clock_IBUF_BUFG | u_stage_ctrl/state_reg[1]_2[0]                       |                                        |                4 |             12 |         3.00 |
+|  clock_IBUF_BUFG | u_bullet_ctrl/lives_reg[1]_1                         | u_fx_ctrl/p_1_in0                      |                6 |             13 |         2.17 |
+|  clock_IBUF_BUFG | g_enemy_probe[0].u_probe/scan_addr_r[14]_i_1_n_0     | u_stage_ctrl/probe_rst                 |                5 |             15 |         3.00 |
+|  clock_IBUF_BUFG | u_bullet_ctrl/map_addr[14]_i_1_n_0                   | u_stage_ctrl/probe_rst                 |                7 |             15 |         2.14 |
+|  clock_IBUF_BUFG | u_probe/scan_addr_r[14]_i_1__2_n_0                   | u_stage_ctrl/probe_rst                 |                5 |             15 |         3.00 |
+|  clock_IBUF_BUFG | u_enemy_ctrl/g_enemy[1].x                            | u_stage_ctrl/g_enemy[1].fire_period    |                9 |             15 |         1.67 |
 |  clock_IBUF_BUFG | u_bullet_ctrl/invuln_cnt                             | u_bullet_ctrl/lives_reg[1]_14          |                7 |             15 |         2.14 |
-|  clock_IBUF_BUFG | u_bullet_ctrl/map_addr[14]_i_1_n_0                   | u_stage_ctrl/probe_rst                 |                5 |             15 |         3.00 |
-|  clock_IBUF_BUFG | g_enemy_probe[0].u_probe/scan_addr_r[14]_i_1_n_0     | u_stage_ctrl/probe_rst                 |                6 |             15 |         2.50 |
-|  clock_IBUF_BUFG | g_enemy_probe[1].u_probe/scan_addr_r[14]_i_1__0_n_0  | u_stage_ctrl/probe_rst                 |                4 |             15 |         3.75 |
-|  clock_IBUF_BUFG | g_enemy_probe[2].u_probe/scan_addr_r[14]_i_1__1_n_0  | u_stage_ctrl/probe_rst                 |                4 |             15 |         3.75 |
-|  clock_IBUF_BUFG | u_probe/scan_addr_r[14]_i_1__2_n_0                   | u_stage_ctrl/probe_rst                 |                6 |             15 |         2.50 |
-|  clock_IBUF_BUFG | u_bullet_ctrl/cool_cnt[24]_i_1_n_0                   | u_stage_ctrl/probe_rst                 |                5 |             15 |         3.00 |
-|  clock_IBUF_BUFG | u_bullet_ctrl/chop_base[14]_i_1_n_0                  | u_stage_ctrl/probe_rst                 |                4 |             16 |         4.00 |
-|  clock_IBUF_BUFG | u_bullet_ctrl/last_cell[3][15]_i_2_n_0               | u_bullet_ctrl/last_cell[3][15]_i_1_n_0 |                4 |             16 |         4.00 |
-|  clock_IBUF_BUFG | u_bullet_ctrl/last_cell[2][15]_i_2_n_0               | u_bullet_ctrl/last_cell[2][15]_i_1_n_0 |                5 |             16 |         3.20 |
-|  clock_IBUF_BUFG | u_bullet_ctrl/last_cell[1][15]_i_2_n_0               | u_bullet_ctrl/last_cell[1][15]_i_1_n_0 |                5 |             16 |         3.20 |
-|  clock_IBUF_BUFG | u_bullet_ctrl/last_cell                              | u_bullet_ctrl/last_cell[0][15]_i_1_n_0 |                4 |             16 |         4.00 |
-|  clock_IBUF_BUFG |                                                      | u_stage_ctrl/state0                    |                7 |             17 |         2.43 |
-|  clock_IBUF_BUFG | u_level_loader/bx[4]_i_1_n_0                         | reset_IBUF                             |                7 |             17 |         2.43 |
-|  clock_IBUF_BUFG | u_player/position_x[9]_i_1_n_0                       | u_stage_ctrl/SR[0]                     |               12 |             18 |         1.50 |
-|  clock_IBUF_BUFG | u_level_loader/wr_addr[14]_i_1_n_0                   | reset_IBUF                             |                6 |             19 |         3.17 |
+|  clock_IBUF_BUFG | u_bullet_ctrl/cool_cnt[24]_i_1_n_0                   | u_stage_ctrl/probe_rst                 |                6 |             15 |         2.50 |
+|  clock_IBUF_BUFG | g_enemy_probe[2].u_probe/scan_addr_r[14]_i_1__1_n_0  | u_stage_ctrl/probe_rst                 |                5 |             15 |         3.00 |
+|  clock_IBUF_BUFG | g_enemy_probe[1].u_probe/scan_addr_r[14]_i_1__0_n_0  | u_stage_ctrl/probe_rst                 |                5 |             15 |         3.00 |
+|  clock_IBUF_BUFG | u_bullet_ctrl/last_cell                              | u_bullet_ctrl/last_cell[0][15]_i_1_n_0 |                5 |             16 |         3.20 |
+|  clock_IBUF_BUFG | u_bullet_ctrl/last_cell[1][15]_i_2_n_0               | u_bullet_ctrl/last_cell[1][15]_i_1_n_0 |                2 |             16 |         8.00 |
+|  clock_IBUF_BUFG | u_bullet_ctrl/chop_base[14]_i_1_n_0                  | u_stage_ctrl/probe_rst                 |                7 |             16 |         2.29 |
+|  clock_IBUF_BUFG | u_bullet_ctrl/last_cell[2][15]_i_2_n_0               | u_bullet_ctrl/last_cell[2][15]_i_1_n_0 |                3 |             16 |         5.33 |
+|  clock_IBUF_BUFG | u_bullet_ctrl/last_cell[3][15]_i_2_n_0               | u_bullet_ctrl/last_cell[3][15]_i_1_n_0 |                5 |             16 |         3.20 |
+|  clock_IBUF_BUFG |                                                      | u_stage_ctrl/state0                    |               11 |             17 |         1.55 |
+|  clock_IBUF_BUFG | u_level_loader/bx[4]_i_1_n_0                         | reset_IBUF                             |                6 |             17 |         2.83 |
+|  clock_IBUF_BUFG | u_level_loader/wr_addr[14]_i_1_n_0                   | reset_IBUF                             |                7 |             19 |         2.71 |
 |  clock_IBUF_BUFG | u_fx_ctrl/g_fx[1].bx[9]_i_1_n_0                      | u_fx_ctrl/p_1_in0                      |                8 |             20 |         2.50 |
-|  clock_IBUF_BUFG |                                                      | u_bullet_ctrl/db_cnt[19]_i_1_n_0       |                5 |             20 |         4.00 |
 |  clock_IBUF_BUFG | u_fx_ctrl/p_1_in                                     | u_fx_ctrl/p_1_in0                      |                8 |             20 |         2.50 |
-|  clock_IBUF_BUFG | u_enemy_ctrl/g_enemy[1].kill_req_reg_0               | u_fx_ctrl/p_1_in0                      |               13 |             20 |         1.54 |
-|  clock_IBUF_BUFG | u_enemy_ctrl/g_enemy[0].kill_req_reg_0               | u_fx_ctrl/p_1_in0                      |               12 |             20 |         1.67 |
-|  clock_IBUF_BUFG | g_enemy_probe[0].u_probe/snap_y[9]_i_2_n_0           | u_stage_ctrl/probe_rst                 |                7 |             22 |         3.14 |
-|  clock_IBUF_BUFG | u_probe/snap_y[9]_i_1__1_n_0                         | u_stage_ctrl/probe_rst                 |                8 |             22 |         2.75 |
+|  clock_IBUF_BUFG | u_enemy_ctrl/g_enemy[1].kill_req_reg_0               | u_fx_ctrl/p_1_in0                      |               14 |             20 |         1.43 |
+|  clock_IBUF_BUFG | u_enemy_ctrl/g_enemy[0].kill_req_reg_0               | u_fx_ctrl/p_1_in0                      |               11 |             20 |         1.82 |
+|  clock_IBUF_BUFG |                                                      | u_bullet_ctrl/db_cnt[19]_i_1_n_0       |                6 |             20 |         3.33 |
+|  clock_IBUF_BUFG | u_player/position_y[9]_i_1_n_0                       | u_stage_ctrl/SR[0]                     |               13 |             20 |         1.54 |
+|  clock_IBUF_BUFG | u_probe/snap_y[9]_i_1__1_n_0                         | u_stage_ctrl/probe_rst                 |                9 |             22 |         2.44 |
 |  clock_IBUF_BUFG | g_enemy_probe[2].u_probe/snap_y[9]_i_1__0_n_0        | u_stage_ctrl/probe_rst                 |                9 |             22 |         2.44 |
 |  clock_IBUF_BUFG | g_enemy_probe[1].u_probe/snap_y[9]_i_1_n_0           | u_stage_ctrl/probe_rst                 |                9 |             22 |         2.44 |
-|  clock_IBUF_BUFG |                                                      | u_enemy_ctrl/g_enemy[2].cnt[23]        |                7 |             23 |         3.29 |
+|  clock_IBUF_BUFG | g_enemy_probe[0].u_probe/snap_y[9]_i_2_n_0           | u_stage_ctrl/probe_rst                 |               10 |             22 |         2.20 |
 |  clock_IBUF_BUFG |                                                      | u_enemy_ctrl/g_enemy[1].cnt[23]        |                7 |             23 |         3.29 |
-|  clock_IBUF_BUFG | u_fx_ctrl/fx_valid[2]                                | u_fx_ctrl/g_fx[2].d[0]_i_1_n_0         |                6 |             24 |         4.00 |
+|  clock_IBUF_BUFG |                                                      | u_enemy_ctrl/g_enemy[2].cnt[23]        |                7 |             23 |         3.29 |
+|  clock_IBUF_BUFG | u_bullet_ctrl/mark_idx[7]_i_1_n_0                    | u_stage_ctrl/probe_rst                 |                8 |             24 |         3.00 |
 |  clock_IBUF_BUFG | u_fx_ctrl/fx_valid[1]                                | u_fx_ctrl/g_fx[1].d[0]_i_1_n_0         |                6 |             24 |         4.00 |
 |  clock_IBUF_BUFG |                                                      | u_player/cnt[0]_i_1_n_0                |                6 |             24 |         4.00 |
-|  clock_IBUF_BUFG | u_bullet_ctrl/mark_idx[7]_i_1_n_0                    | u_stage_ctrl/probe_rst                 |                5 |             24 |         4.80 |
 |  clock_IBUF_BUFG |                                                      | u_bullet_ctrl/spd_cnt[0]_i_1_n_0       |                6 |             24 |         4.00 |
-|  clock_IBUF_BUFG |                                                      | u_enemy_ctrl/g_enemy[0].cnt[0]_i_1_n_0 |                6 |             24 |         4.00 |
 |  clock_IBUF_BUFG | u_fx_ctrl/fx_valid[0]                                | u_fx_ctrl/g_fx[0].d[0]_i_1_n_0         |                6 |             24 |         4.00 |
+|  clock_IBUF_BUFG | u_fx_ctrl/fx_valid[2]                                | u_fx_ctrl/g_fx[2].d[0]_i_1_n_0         |                6 |             24 |         4.00 |
 |  clock_IBUF_BUFG | u_fx_ctrl/fx_valid[3]                                | u_fx_ctrl/g_fx[3].d[0]_i_1_n_0         |                6 |             24 |         4.00 |
-|  clock_IBUF_BUFG | u_stage_ctrl/clear_timer[31]_i_1_n_0                 | u_stage_ctrl/state0                    |                8 |             32 |         4.00 |
-|  clock_IBUF_BUFG | u_map_bus/E[0]                                       | u_stage_ctrl/probe_rst                 |               11 |             32 |         2.91 |
-|  clock_IBUF_BUFG | u_stage_ctrl/spawn_timer[31]_i_1_n_0                 | u_stage_ctrl/state0                    |                8 |             32 |         4.00 |
-|  clock_IBUF_BUFG | g_enemy_probe[0].u_probe/g_ty_last_reg_i_1__1_n_0    | u_stage_ctrl/probe_rst                 |               17 |             32 |         1.88 |
-|  clock_IBUF_BUFG |                                                      | u_fx_ctrl/p_1_in0                      |               19 |             32 |         1.68 |
-|  clock_IBUF_BUFG | g_enemy_probe[1].u_probe/CEP                         | u_stage_ctrl/probe_rst                 |               14 |             32 |         2.29 |
-|  clock_IBUF_BUFG | g_enemy_probe[2].u_probe/g_ty_last_reg_i_1__0_n_0    | u_stage_ctrl/probe_rst                 |               15 |             32 |         2.13 |
-|  clock_IBUF_BUFG |                                                      | reset_IBUF                             |               12 |             33 |         2.75 |
-|  clock_IBUF_BUFG |                                                      | u_stage_ctrl/probe_rst                 |               27 |             52 |         1.93 |
-|  clock_IBUF_BUFG |                                                      |                                        |               31 |             54 |         1.74 |
-|  vga_clk_BUFG    |                                                      |                                        |              161 |            389 |         2.42 |
+|  clock_IBUF_BUFG |                                                      | u_enemy_ctrl/g_enemy[0].cnt[0]_i_1_n_0 |                6 |             24 |         4.00 |
+|  clock_IBUF_BUFG | u_stage_ctrl/spawn_timer[31]_i_1_n_0                 | u_stage_ctrl/state0                    |                6 |             32 |         5.33 |
+|  clock_IBUF_BUFG | u_stage_ctrl/clear_timer[31]_i_1_n_0                 | u_stage_ctrl/state0                    |                9 |             32 |         3.56 |
+|  clock_IBUF_BUFG | g_enemy_probe[1].u_probe/CEP                         | u_stage_ctrl/probe_rst                 |               13 |             32 |         2.46 |
+|  clock_IBUF_BUFG | g_enemy_probe[0].u_probe/g_ty_last_reg_i_1__1_n_0    | u_stage_ctrl/probe_rst                 |               13 |             32 |         2.46 |
+|  clock_IBUF_BUFG | g_enemy_probe[2].u_probe/g_ty_last_reg_i_1__0_n_0    | u_stage_ctrl/probe_rst                 |               16 |             32 |         2.00 |
+|  clock_IBUF_BUFG |                                                      | u_fx_ctrl/p_1_in0                      |               16 |             32 |         2.00 |
+|  clock_IBUF_BUFG | u_map_bus/E[0]                                       | u_stage_ctrl/probe_rst                 |               13 |             32 |         2.46 |
+|  clock_IBUF_BUFG |                                                      | reset_IBUF                             |               14 |             35 |         2.50 |
+|  clock_IBUF_BUFG |                                                      | u_stage_ctrl/probe_rst                 |               26 |             52 |         2.00 |
+|  clock_IBUF_BUFG |                                                      |                                        |               30 |             54 |         1.80 |
+|  vga_clk_BUFG    |                                                      |                                        |              168 |            389 |         2.32 |
 +------------------+------------------------------------------------------+----------------------------------------+------------------+----------------+--------------+
 
 

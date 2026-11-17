@@ -281,10 +281,10 @@ module tb_stage;
         // （level2.txt 第 4 行第 2 列的 'SS'，展开到 4x4 格 = 像素 8..11 x 16..19）
         check_cell("S05d level2 no river at (1,33)", 1, 33, 4'd0);
         check_cell("S05e level2 steel at (9,17)",     9, 17, 4'd2);
-        // 基地块展开：'H' 块里只有 4x4 格是 tile 5（= 鹰的 20x20 包围盒），
-        // 该块剩下的格子补成砖 —— 砖墙因此紧贴着基地。
-        check_cell("S05f base shell is brick",      56, 112, 4'd1);
-        check_cell("S05g base itself is tile 5",     58, 113, 4'd5);
+        // 基地块展开：'H' 块里基地本体是 4x4 格（= 鹰的 20x20 包围盒），
+        // 外面套一圈 2 格（10px）厚的砖墙（上/左/右），环以外留空（0）。
+        check_cell("S05f base shell is brick",      56, 114, 4'd1);
+        check_cell("S05g base itself is tile 5",     58, 116, 4'd5);
         check_cell("S05h last cell rewritten by loader", 119, 119, 4'd0);
 
         // ---------------- S06 新关开局 ----------------

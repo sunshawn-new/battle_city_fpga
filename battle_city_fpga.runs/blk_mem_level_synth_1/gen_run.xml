@@ -1,14 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<GenRun Id="blk_mem_level_synth_1" LaunchPart="xc7a35tcpg236-1" LaunchTime="1794827316">
+<GenRun Id="blk_mem_level_synth_1" LaunchPart="xc7a35tcpg236-1" LaunchTime="1794838575">
   <File Type="PA-TCL" Name="blk_mem_level.tcl"/>
-  <File Type="RDS-PROPCONSTRS" Name="blk_mem_level_drc_synth.rpt"/>
   <File Type="REPORTS-TCL" Name="blk_mem_level_reports.tcl"/>
   <File Type="RDS-RDS" Name="blk_mem_level.vds"/>
   <File Type="RDS-UTIL" Name="blk_mem_level_utilization_synth.rpt"/>
   <File Type="RDS-UTIL-PB" Name="blk_mem_level_utilization_synth.pb"/>
   <File Type="RDS-DCP" Name="blk_mem_level.dcp"/>
-  <File Type="VDS-TIMINGSUMMARY" Name="blk_mem_level_timing_summary_synth.rpt"/>
-  <File Type="VDS-TIMING-PB" Name="blk_mem_level_timing_summary_synth.pb"/>
   <FileSet Name="sources" Type="BlockSrcs" RelSrcDir="$PSRCDIR/blk_mem_level">
     <File Path="$PSRCDIR/sources_1/ip/blk_mem_level/blk_mem_level.xci">
       <FileInfo>

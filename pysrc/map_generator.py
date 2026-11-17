@@ -19,8 +19,8 @@
 #  墙厚取 1 块（20px = 4 格）才不会被贴图切断。炮弹打掉 20x10，正好半块。
 #
 #  写完会做一遍约束校验（不通过就报错退出，不会留下半成品 map.coe）：
-#    1. 基地本体必须正好是 列 58~61 x 行 113~116 的 4x4 格 —— 正好等于
-#       vga.v 里那张 20x20 金鹰精灵的包围盒（HQ_X0/HQ_Y0 = 290/565），
+#    1. 基地本体必须正好是 列 58~61 x 行 116~119 的 4x4 格 —— 正好等于
+#       vga.v 里那张 20x20 金鹰精灵的包围盒（HQ_X0/HQ_Y0 = 290/580），
 #       所以鹰身上不会出现"黑缝"；整张地图不许有第二处 tile_id = 5。
 #    2. 基地四周（上下左右各 1 格）必须是砖/钢 —— 砖块必须把基地围起来，
 #       否则坦克能直接贴着基地开火，一炮就没了。
@@ -55,11 +55,15 @@ TILE_NAME = {0: '空地', 1: '砖', 2: '钢', 3: '河', 4: '树', 5: '基地'}
 PASSABLE = (0, 4)                    # 坦克能过的地形（树林只是盖住坦克）
 
 # 基地本体：正好等于 vga.v 里 20x20 金鹰精灵的包围盒（格坐标）
-#   精灵画在 290..309 / 565..584 像素 -> 格 58..61 x 113..116
-#   （290/5 = 58，565/5 = 113，宽高各 4 格）
-# 只有这 4x4 格是 tile 5；关卡文件里的 'H' 块其余格子由 expand() 补成砖，
-# 于是砖墙是紧贴着鹰的，不会出现一圈 40x30 的黑缝。
-HQ_X0, HQ_Y0, HQ_W, HQ_H = 58, 113, 4, 4
+#   精灵画在 290..309 / 580..599 像素 -> 格 58..61 x 116..119
+#   （290/5 = 58，580/5 = 116，宽高各 4 格）
+# 基地贴着 600px 玩区的底边（原版 Battle City 的样式）。
+# 只有这 4x4 格是 tile 5；关卡文件里的 'H' 块其余格子由 expand() 补成
+# 一圈 2 格（10px）厚的砖墙（上/左/右三面），环以外留空 —— 墙厚 = 鹰宽的一半，
+# 和原版“薄砖围一圈”的比例一致（旧版把整个 'H' 块填成实心砖，像一大块砖）。
+HQ_X0, HQ_Y0, HQ_W, HQ_H = 58, 116, 4, 4
+# 砖墙厚度（格）：2 格 = 10px
+HQ_SHELL = 2
 # 出生点（像素）
 #   玩家：基地左侧、贴着底部那一行（原版 Battle City 的玩家 1 出生点位置）。
 #         200 = 格列 40 = 块列 10；560 = 格行 112 = 块行 28 —— 车身正好压 1 块。
@@ -101,9 +105,10 @@ def check_level(rows):
         sys.exit('关卡文件有问题：\n  ' + '\n  '.join(errs))
 
 def expand(rows):
-    """块 -> 格。'H' 块里落在基地矩形内的格子是 5；矩形上/左/右的格子补砖
-       （U 型堡垒的墙），矩形【下方】的格子留空 —— 经典 Battle City 的基地
-       正面敞开：鹰完整可见，不埋在整块砖里。"""
+    """块 -> 格。'H' 块里：基地矩形内是 5；矩形外面套一圈 HQ_SHELL 格厚的砖墙
+       （上 / 左 / 右三面），环以外留空 —— 原版 Battle City 的“薄砖围一圈”。
+       基地贴着地图底边（HQ_Y0 + HQ_H = 120），下方不需要墙：
+       terrain_probe 的 edge_blocked 把地图外的格子天然当砖。"""
     cells = [[0] * MAP_COLS for _ in range(MAP_ROWS)]
     for by in range(BROWS):
         for bx in range(BCOLS):
@@ -115,11 +120,14 @@ def expand(rows):
                     if ch == 'H':
                         in_hq = (HQ_X0 <= gx < HQ_X0 + HQ_W and
                                  HQ_Y0 <= gy < HQ_Y0 + HQ_H)
+                        in_shell = (HQ_X0 - HQ_SHELL <= gx < HQ_X0 + HQ_W + HQ_SHELL and
+                                    HQ_Y0 - HQ_SHELL <= gy < HQ_Y0 + HQ_H and
+                                    not in_hq)
                         if in_hq:
                             cells[gy][gx] = 5
-                        elif gy < HQ_Y0 + HQ_H:   # 上/左/右：砖墙
+                        elif in_shell:
                             cells[gy][gx] = 1
-                        # gy >= HQ_Y0 + HQ_H：正面敞开，留空
+                        # 环以外：留空
                     else:
                         cells[gy][gx] = TILE_CHAR[ch]
     return cells
@@ -207,21 +215,27 @@ def validate(cells):
     if stray:
         errs.append(f'基地矩形之外还有 {len(stray)} 格 tile 5，例如 {stray[0]}')
 
-    # --- 1b. 砖块必须把基地围起来（经典 U 型堡垒：左/上/右三面） ---
-    # 基地本体只有 4x4 格（= 鹰的 20x20 包围盒），左/上/右各 1 格必须是砖/钢：
+    # --- 1b. 砖块必须把基地围起来（环厚 HQ_SHELL 格：上/左/右三面） ---
+    # 基地本体只有 4x4 格（= 鹰的 20x20 包围盒），外面套一圈 2 格（10px）厚的砖墙：
     # 这样敌人只能先打掉砖墙才摸得到基地，玩家也才有"守家"这件事可做。
-    # 下方【不要求】—— 正面敞开，鹰完整可见（旧版把鹰整个埋进实心砖块，
-    # 正面看不到基地）；而且基地贴着地图底边，坦克永远站不到基地下面，
-    # 敞开不会带来新的进攻路线。
-    shell = ([(HQ_X0 - 1, y) for y in range(HQ_Y0, HQ_Y0 + HQ_H)] +
-             [(HQ_X0 + HQ_W, y) for y in range(HQ_Y0, HQ_Y0 + HQ_H)] +
-             [(x, HQ_Y0 - 1) for x in range(HQ_X0, HQ_X0 + HQ_W)])
+    # 环厚 = 鹰宽的一半，和原版 Battle City 的比例一致。
+    # 下方不要求墙：基地贴着地图底边（HQ_Y0 + HQ_H = MAP_ROWS），
+    # 坦克永远站不到基地下面，敞开不会带来新的进攻路线。
+    shell = [(x, y) for y in range(HQ_Y0 - HQ_SHELL, HQ_Y0 + HQ_H)
+             for x in range(HQ_X0 - HQ_SHELL, HQ_X0 + HQ_W + HQ_SHELL)
+             if not (HQ_X0 <= x < HQ_X0 + HQ_W and HQ_Y0 <= y < HQ_Y0 + HQ_H)]
     leak = [(x, y) for (x, y) in shell
             if 0 <= x < MAP_COLS and 0 <= y < MAP_ROWS
             and cells[y][x] not in (TILE_CHAR['#'], TILE_CHAR['S'])]
     if leak:
         errs.append(f'基地外壳有 {len(leak)} 格不是砖/钢（坦克能直接摸到基地），'
                     f'例如 {leak[0]}')
+
+    # --- 1c. 基地必须贴地图底边（原版样式）：下面不能再留格子 ---
+    # 否则坦克能绕到基地背后，而且"背后"那几格既没墙也没意义。
+    if HQ_Y0 + HQ_H != MAP_ROWS:
+        errs.append(f'基地必须贴地图底边：HQ_Y0 + HQ_H = {HQ_Y0 + HQ_H}，'
+                    f'应该等于 {MAP_ROWS}')
 
     # --- 2. 出生点净空 ---
     # 玩家出生点贴着画面底部那一行，所以往下的通道会被画面边缘截断，用 clip=True。
@@ -241,10 +255,15 @@ def validate(cells):
     start = (px // 5, py // 5)
     seen = bfs_reach(cells, start)
     targets = [(ex // 5, ey // 5, f'敌人出生点({ex},{ey})') for (ex, ey) in ENEMY_SPAWNS]
-    # 基地堡垒周围：从堡垒砖墙往外找第一格可通行的格子（墙厚随关卡不同，所以不能写死偏移）
-    targets += [(nearest_open(cells, HQ_X0 - 1, HQ_Y0 + 2, -1), HQ_Y0 + 2, '基地堡垒左侧'),
-                (nearest_open(cells, HQ_X0 + HQ_W, HQ_Y0 + 2, +1), HQ_Y0 + 2, '基地堡垒右侧'),
-                (HQ_X0 + HQ_W // 2, nearest_open(cells, HQ_Y0 - 1, HQ_X0 + HQ_W // 2, -1, 'y'),
+    # 基地堡垒周围：从堡垒砖墙往外找第一格可通行的格子（墙厚 = HQ_SHELL 格，
+    # 所以探测行取“环外面那一行”，不能写死偏移）。
+    probe_row = HQ_Y0 - HQ_SHELL - 1          # 环正上方的一行（HQ_Y0-3 = 113）
+    targets += [(nearest_open(cells, HQ_X0 - HQ_SHELL - 1, probe_row, -1), probe_row,
+                 '基地堡垒左侧'),
+                (nearest_open(cells, HQ_X0 + HQ_W + HQ_SHELL, probe_row, +1), probe_row,
+                 '基地堡垒右侧'),
+                (HQ_X0 + HQ_W // 2,
+                 nearest_open(cells, probe_row, HQ_X0 + HQ_W // 2, -1, 'y'),
                  '基地堡垒上方')]
     for (tx, ty, name) in targets:
         if not seen[ty][tx]:
@@ -266,11 +285,12 @@ def validate(cells):
         if (ex, ey) not in reach:
             errs.append(f'敌人出生点 ({ex},{ey}) 的 20x20 车身开不到（通道太窄）')
     # 基地三面的"贴脸位置"：左 / 右 / 正上方各一处（就是敌人能打到基地的位置）。
-    # 堡垒占块 14~15 x 28~29（x 280~319 / y 560~599），所以三个贴脸位置正好是
-    # 块 (12,28) / (17,28) / (15,25)，起点都是整块的倍数。
-    for name, (tx, ty) in (('基地左侧', (240, 560)),
-                           ('基地右侧', (340, 560)),
-                           ('基地正上方', (300, 500))):
+    # 堡垒占块 14~15 x 28~29（x 280~319 / y 560~599），薄砖环在 280..289 /
+    # 310..319 两列和 570..579 那一行，所以三个贴脸位置正好是
+    # (260,580) / (320,580) / (300,550)，起点都是整格（5px）的倍数。
+    for name, (tx, ty) in (('基地左侧', (260, 580)),
+                           ('基地右侧', (320, 580)),
+                           ('基地正上方', (300, 550))):
         if (tx, ty) not in reach:
             errs.append(f'{name} 贴脸位置 ({tx},{ty}) 的 20x20 车身开不到')
     notes.append(f'坦克可达位置 {len(reach)} 个（20x20 车身整体 BFS）')

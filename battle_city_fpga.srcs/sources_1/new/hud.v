@@ -278,8 +278,11 @@ module hud #(
     always @(posedge clock) blink_cnt <= blink_cnt + 25'd1;
     wire blink = blink_cnt[24];
 
+    // 结算横幅的底色只在真的结算（GAME OVER / STAGE CLEAR）时画。
+    // 以前少了 (game_over || victory)，游戏进行中每 1.5s 也会闪一条
+    // 200px 宽、14px 高的纯绿带（板子上肉眼可见）。
     wire banner_on = (y >= 11'd300) && (y < 11'd314);
-    wire banner_bg = banner_on && blink;
+    wire banner_bg = banner_on && (game_over || victory) && blink;
 
     // 颜色（12 位）：标题黄、标签浅蓝、数值白
     reg [11:0] text_color;

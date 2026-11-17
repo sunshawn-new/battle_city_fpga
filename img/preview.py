@@ -9,7 +9,7 @@
 #    · 左边 600x600 是玩区（120x120 格 x 5px），右边 200x200 是 HUD
 #    · 每格 5x5 像素；背景贴图是“20x20 的图样平铺”，所以取 img_x % 20 / img_y % 20
 #    · tile_id 1/2/3 -> 砖/钢/河，4 -> 树林（最高层，只有不透明像素才盖住上层），
-#      5 -> 基地，只在该 20x20 的鹰包围盒里（vga.v 的 HQ_X0/HQ_Y0 = 290/565）画不透明像素
+#      5 -> 基地，只在该 20x20 的鹰包围盒里（vga.v 的 HQ_X0/HQ_Y0 = 290/580）画不透明像素
 #    · 图层优先级：HUD > 树林 > 爆炸 > 炮弹 > 坦克 > 地形
 #    · 12 位色 word[11:0] = {R,G,B}，最高位是 alpha
 #    · 坦克：玩家用 tank，三个敌人按兵种用 tank_fast / tank_power / tank_armor
@@ -44,7 +44,7 @@ MAP_W, MAP_H, TILE = 120, 120, 5
 PANEL_X = 600                             # 侧栏起点（hud.v 的 X0）
 W, H = 800, 600                           # 整个画面
 PLAY_W, PLAY_H = MAP_W * TILE, MAP_H * TILE   # 600 x 600 玩区
-HQ_X0, HQ_Y0 = 290, 565                   # 和 vga.v 的 localparam 保持一致
+HQ_X0, HQ_Y0 = 290, 580                   # 和 vga.v 的 localparam 保持一致（基地贴底）
 PLAYER_X, PLAYER_Y = 200, 560             # player.v 的 SPAWN_X/SPAWN_Y（第 1 关出生点）
 BULLET_X, BULLET_Y = 305, 260             # 演示用：坦克正上方一发
 

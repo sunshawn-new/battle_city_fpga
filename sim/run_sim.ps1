@@ -92,7 +92,7 @@ try {
     # （Min 只是“下限”，防止某个用例被整段跳过还显示 PASS；
     #   改了测试台就顺手把这里上调，别让它长期偏小）
     $tbs = @(
-        [pscustomobject]@{ Name = 'tb_terrain'; File = 'tb_terrain.v'; Min = 25 },
+        [pscustomobject]@{ Name = 'tb_terrain'; File = 'tb_terrain.v'; Min = 30 },
         [pscustomobject]@{ Name = 'tb_bullet';  File = 'tb_bullet.v';  Min = 88 },
         [pscustomobject]@{ Name = 'tb_enemy';   File = 'tb_enemy.v';   Min = 61 },
         [pscustomobject]@{ Name = 'tb_combat';  File = 'tb_combat.v';  Min = 34 },

@@ -35,7 +35,8 @@ module level_loader #(
     parameter MAP_W = 120,            // 地图多少格宽（BCOLS * 4）
     parameter LEVEL_SLOT = 1024,      // 关卡 ROM 里每关占多少项（900 向上取到 1024）
     parameter HQ_X0 = 58,             // 基地本体（格坐标）= vga.v 那张 20x20 金鹰
-    parameter HQ_Y0 = 113,            // 精灵的包围盒，和 map_generator.py 一致
+    parameter HQ_Y0 = 116,            // 精灵的包围盒，和 map_generator.py 一致
+                                      // 116*5 = 580：基地贴着 600px 的底边（原版样式）
     parameter HQ_W  = 4,
     parameter HQ_H  = 4
 )(
@@ -59,11 +60,12 @@ module level_loader #(
     output reg        done            // 单拍：装载完成
 );
     localparam S_IDLE = 2'd0,
-               S_ADS  = 2'd1,         // 地址已经送出，等 ROM 采进去（1 拍读延迟的第 1 拍）
+               S_ADS  = 2'd1,         // 地址已经送出，等 ROM 把数据打出来（见下面的等待计数）
                S_LAT  = 2'd2,         // rom_dout 本拍有效：锁存本块的 tile_id
                S_WR   = 2'd3;         // 写这一块的 4x4 格
 
     reg [1:0]  state = S_IDLE;
+    reg [1:0]  lat_cnt = 2'd0;        // 等 ROM 数据的拍数（0..2）
     reg [4:0]  bx = 5'd0, by = 5'd0;  // 块坐标 0..29
     reg [3:0]  cc = 4'd0;             // 块内格子 0..15
     reg [3:0]  blk = 4'd0;            // 本块的 tile_id
@@ -82,13 +84,17 @@ module level_loader #(
     // 块内第 cc 格的格坐标：gx = bx*4 + cc[1:0]，gy = by*4 + cc[3:2]
     wire [6:0]  gx = {2'b0, bx, 2'b00} + {5'd0, cc[1:0]};
     wire [6:0]  gy = {2'b0, by, 2'b00} + {5'd0, cc[3:2]};
-    // 基地块：落在基地矩形（4x4 格 = 鹰的 20x20 包围盒）里的格子是 5，
-    // 矩形上/左/右的格子补砖（U 型堡垒的墙），矩形下方敞开留空 ——
-    // 经典样式：鹰完整可见，不埋在整块砖里。和 pysrc 的 expand 规则逐格一致。
-    wire        in_hq = (gx >= HQ_X0) && (gx < HQ_X0 + HQ_W) &&
-                        (gy >= HQ_Y0) && (gy < HQ_Y0 + HQ_H);
-    wire [3:0]  tile  = (blk == 4'd5) ? (in_hq ? 4'd5
-                                             : ((gy < HQ_Y0 + HQ_H) ? 4'd1 : 4'd0))
+    // 基地块：基地本体 = 4x4 格（= 鹰的 20x20 包围盒），外面套一圈【2 格厚】的
+    // 砖墙（上 / 左 / 右三面；墙厚 10px = 鹰宽的一半，和原版 Battle City 的比例一致）。
+    // 环以外（'H' 块里剩下的格子）一律留空 —— 堡垒因此是“薄砖围一圈”，
+    // 不会变成一大块实心砖。基地贴着地图底边（HQ_Y0 + HQ_H = 120），
+    // 下方不需要墙：terrain_probe 的 edge_blocked 把地图外的格子天然当砖。
+    // 和 pysrc/map_generator.py 的 expand() / gen_levels.py 的 expand_cells() 逐格一致。
+    wire        in_hq    = (gx >= HQ_X0) && (gx < HQ_X0 + HQ_W) &&
+                           (gy >= HQ_Y0) && (gy < HQ_Y0 + HQ_H);
+    wire        in_shell = (gx >= HQ_X0 - 2) && (gx < HQ_X0 + HQ_W + 2) &&
+                           (gy >= HQ_Y0 - 2) && (gy < HQ_Y0 + HQ_H) && !in_hq;
+    wire [3:0]  tile  = (blk == 4'd5) ? (in_hq ? 4'd5 : (in_shell ? 4'd1 : 4'd0))
                                       : blk;
     // 地图地址 = gy * MAP_W + gx；MAP_W = 120 = 128 - 8
     wire [14:0] cell_addr = ({8'd0, gy} << 7) - ({8'd0, gy} << 3) + {8'd0, gx};
@@ -98,6 +104,7 @@ module level_loader #(
     always @(posedge clock) begin
         if (reset) begin
             state    <= S_IDLE;
+            lat_cnt  <= 2'd0;
             bx       <= 5'd0;
             by       <= 5'd0;
             cc       <= 4'd0;
@@ -118,6 +125,7 @@ module level_loader #(
                         bx       <= 5'd0;
                         by       <= 5'd0;
                         cc       <= 4'd0;
+                        lat_cnt  <= 2'd0;
                         base     <= lv_base;
                         rom_addr <= lv_base;              // 第 0 块
                         state    <= S_ADS;
@@ -125,12 +133,24 @@ module level_loader #(
                 end
 
                 S_ADS: begin
-                    // 地址已经稳定了一整拍，ROM 在这一拍末尾把数据打出来
-                    state <= S_LAT;
+                    // 【为什么不是“只等 1 拍”】
+                    // 真实 blk_mem_level 的读延迟不一定是 1 拍：IP 里
+                    // C_HAS_MEM_OUTPUT_REGS_A=1（原语输出寄存器）叠上 BRAM 自己的
+                    // DOA 寄存器，实测是 2 拍。以前这里只等 1 拍就采样，板上就
+                    // “晚一个块”——整张地图右移 4 格、基地只剩块 15 的 H 被展开。
+                    // 现在固定等 3 拍再采样：地址在整个等待期保持不变、ROM 输出也
+                    // 会被保持，所以读延迟 0/1/2/3 拍都成立（tb 的 4 组延迟全过）。
+                    // 代价：每块多 2 拍，900 块 ≈ 多 18us，看不出来。
+                    if (lat_cnt != 2'd2) begin
+                        lat_cnt <= lat_cnt + 2'd1;
+                    end else begin
+                        lat_cnt <= 2'd0;
+                        state   <= S_LAT;
+                    end
                 end
 
                 S_LAT: begin
-                    // rom_dout 就是上面那个地址的数据（1 拍读延迟）
+                    // rom_dout 就是上面那个地址的数据（读延迟已由 S_ADS 的等待覆盖）
                     blk   <= rom_dout;
                     cc    <= 4'd0;
                     state <= S_WR;

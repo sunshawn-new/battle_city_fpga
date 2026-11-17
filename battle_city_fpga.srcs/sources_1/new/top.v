@@ -444,7 +444,9 @@ module top #(
     level_loader #(
         // 基地本体 = 4x4 格（鹰的 20x20 包围盒），和 map_generator.py 的
         // HQ_X0/HQ_Y0/HQ_W/HQ_H 必须一模一样，否则换关后基地会错位。
-        .MAP_W(MAP_W), .HQ_X0(58), .HQ_Y0(113), .HQ_W(4), .HQ_H(4)
+        // HQ_Y0 = 116 -> 580px：基地贴着 600px 的底边（原版 Battle City 的样式），
+        // 外面由 level_loader 补一圈 2 格厚的砖墙。
+        .MAP_W(MAP_W), .HQ_X0(58), .HQ_Y0(116), .HQ_W(4), .HQ_H(4)
     ) u_level_loader (
         .clock(clock), .reset(reset),
         .start(lvl_load_start), .level(lvl_load_level),
