@@ -1,7 +1,7 @@
 Copyright 1986-2021 Xilinx, Inc. All Rights Reserved.
 -------------------------------------------------------------------------------------------------------------------------------
 | Tool Version     : Vivado v.2021.1 (win64) Build 3247384 Thu Jun 10 19:36:33 MDT 2021
-| Date             : Tue Nov 17 10:00:52 2026
+| Date             : Tue Nov 17 15:04:03 2026
 | Host             : LAPTOP-8QJD8CCP running 64-bit major release  (build 9200)
 | Command          : report_power -file top_power_routed.rpt -pb top_power_summary_routed.pb -rpx top_power_routed.rpx
 | Design           : top
@@ -30,10 +30,10 @@ Table of Contents
 ----------
 
 +--------------------------+--------------+
-| Total On-Chip Power (W)  | 0.126        |
+| Total On-Chip Power (W)  | 0.124        |
 | Design Power Budget (W)  | Unspecified* |
 | Power Budget Margin (W)  | NA           |
-| Dynamic (W)              | 0.054        |
+| Dynamic (W)              | 0.051        |
 | Device Static (W)        | 0.072        |
 | Effective TJA (C/W)      | 5.0          |
 | Max Ambient (C)          | 84.4         |
@@ -53,18 +53,18 @@ Table of Contents
 | On-Chip        | Power (W) | Used     | Available | Utilization (%) |
 +----------------+-----------+----------+-----------+-----------------+
 | Clocks         |     0.010 |        4 |       --- |             --- |
-| Slice Logic    |     0.008 |     9596 |       --- |             --- |
-|   LUT as Logic |     0.007 |     5208 |     20800 |           25.04 |
+| Slice Logic    |     0.008 |     9546 |       --- |             --- |
+|   LUT as Logic |     0.007 |     5021 |     20800 |           24.14 |
 |   CARRY4       |     0.001 |      767 |      8150 |            9.41 |
-|   Register     |    <0.001 |     1831 |     41600 |            4.40 |
+|   Register     |    <0.001 |     1944 |     41600 |            4.67 |
 |   F7/F8 Muxes  |    <0.001 |       37 |     32600 |            0.11 |
 |   Others       |     0.000 |       83 |       --- |             --- |
-| Signals        |     0.010 |     7047 |       --- |             --- |
+| Signals        |     0.009 |     6668 |       --- |             --- |
 | Block RAM      |     0.023 |       11 |        50 |           22.00 |
-| DSPs           |     0.002 |       34 |        90 |           37.78 |
+| DSPs           |    <0.001 |       10 |        90 |           11.11 |
 | I/O            |    <0.001 |       21 |       106 |           19.81 |
 | Static Power   |     0.072 |          |           |                 |
-| Total          |     0.126 |          |           |                 |
+| Total          |     0.124 |          |           |                 |
 +----------------+-----------+----------+-----------+-----------------+
 
 
@@ -74,7 +74,7 @@ Table of Contents
 +-----------+-------------+-----------+-------------+------------+-------------+-------------+------------+
 | Source    | Voltage (V) | Total (A) | Dynamic (A) | Static (A) | Powerup (A) | Budget (A)  | Margin (A) |
 +-----------+-------------+-----------+-------------+------------+-------------+-------------+------------+
-| Vccint    |       1.000 |     0.061 |       0.051 |      0.010 |       NA    | Unspecified | NA         |
+| Vccint    |       1.000 |     0.058 |       0.048 |      0.010 |       NA    | Unspecified | NA         |
 | Vccaux    |       1.800 |     0.013 |       0.000 |      0.013 |       NA    | Unspecified | NA         |
 | Vcco33    |       3.300 |     0.001 |       0.000 |      0.001 |       NA    | Unspecified | NA         |
 | Vcco25    |       2.500 |     0.000 |       0.000 |      0.000 |       NA    | Unspecified | NA         |
@@ -144,14 +144,15 @@ Table of Contents
 +----------------------------+-----------+
 | Name                       | Power (W) |
 +----------------------------+-----------+
-| top                        |     0.054 |
-|   g_enemy_probe[1].u_probe |     0.003 |
-|   u_bullet_ctrl            |     0.006 |
+| top                        |     0.051 |
+|   g_enemy_probe[2].u_probe |     0.001 |
+|   u_bullet_ctrl            |     0.005 |
 |   u_enemy_ctrl             |     0.004 |
 |   u_fx_ctrl                |     0.002 |
 |   u_map_ram                |     0.012 |
 |     U0                     |     0.012 |
 |       inst_blk_mem_gen     |     0.012 |
+|   u_probe                  |     0.001 |
 |   u_stage_ctrl             |     0.002 |
 |   u_vga                    |     0.018 |
 +----------------------------+-----------+

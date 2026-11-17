@@ -25,6 +25,11 @@
 //  时序（和抽出来之前完全一致，原来的 15 条仿真断言仍然成立）：
 //    地址路径被刻意切成“FF -> 比较/mux -> 移位加法 -> BRAM”，
 //    S_SCAN 第 0 拍把地址锁进 map_addr，1~3 拍保持，第 4 拍采样。
+//
+//  资源（C 方案）：坐标恒为 TILE=5 的整数倍，所以 S_GEOM 里原来 8 次 div5
+//    （乘 205 右移 10，每次被吸收成 1 个 DSP48E1）收敛成 2 次（col0 = x/5、
+//    row0 = y/5），其余 6 个边界值由 ±常数得到：本实例 8 DSP -> 2 DSP，
+//    全设计 34 -> 10 个 DSP（4 个实例 + 炮弹的 2 个）。功能逐格等价。
 // ============================================================================
 module terrain_probe #(
     parameter MAP_W  = 120,     // 地图横向格数（600px / 5）
@@ -137,6 +142,31 @@ module terrain_probe #(
         end
     endfunction
 
+    // ---- 车身覆盖的格数（TANK_W/TANK_H = 20、TILE = 5 -> 正好 4 格）----
+    // 坐标恒为 TILE 的整数倍（player/enemy_ctrl 整格移动，见文件顶部的“不变量”），
+    // 因此边界值只需要一次除法再加常数：
+    //   div5(x + TANK_W - 1) = col0 + 3    div5(x - 1) = col0 - 1    div5(x + TANK_W) = col0 + 4
+    //   div5(y + TANK_H - 1) = row0 + 3    div5(y - 1) = row0 - 1    div5(y + TANK_H) = row0 + 4
+    // 以前这里调用了 8 次 div5，Vivado 把它们全部吸收进 DSP48E1（4 个实例 = 32 个 DSP）；
+    // 收敛成 2 次之后每个实例只占 2 个 DSP（全设计 34 -> 10），组合锥也短了。
+    localparam [7:0] COL_LAST = (TANK_W - 1) / TILE;   // 右边缘相对列偏移 = 3
+    localparam [7:0] ROW_LAST = (TANK_H - 1) / TILE;   // 下边缘相对行偏移 = 3
+    localparam [7:0] COL_NEXT = TANK_W / TILE;         // 前进方向多探一格 = 4
+    localparam [7:0] ROW_NEXT = TANK_H / TILE;
+
+    wire [7:0] col0 = div5(x);      // 车身左边缘所在列
+    wire [7:0] row0 = div5(y);      // 车身上边缘所在行
+
+    // 上面这套“±常数”的等价替换依赖【坐标恒为 TILE 的整数倍】这条不变量
+    // （player/enemy_ctrl 每次移动走整格；出生点 290/580、40/300/560 也都是 5 的倍数）。
+    // 仿真时兜一层：万一以后有测试台把坦克摆到不对齐的坐标，这里会直接报出来，
+    // 免得“前方地形查错格”这种 bug 变成难查的现象。综合时整段被去掉。
+`ifndef SYNTHESIS
+    always @(posedge clock)
+        if (!reset && (((x % TILE) != 0) || ((y % TILE) != 0)))
+            $display("[terrain_probe] ERROR: x=%0d y=%0d 不是 TILE=%0d 的整数倍", x, y, TILE);
+`endif
+
     // 取两个地形中“最硬”的一个：只要有一格不能通行，就按不能通行处理
     function [3:0] merge_terrain;
         input [3:0] a;
@@ -192,19 +222,20 @@ module terrain_probe #(
                 // 等总线的独占窗口：总线空闲时 map_gnt 与本拍的 map_req 同时成立，
                 // 完全不额外花拍数；被炮弹占用时在这里等（最长几十拍，62.5Hz 无感）。
                 if (map_gnt) begin
-                    g_tx_first <= div5(x);                  // 左边缘所在列
-                    g_tx_last  <= div5(x + TANK_W - 1);     // 右边缘所在列
-                    g_ty_first <= div5(y);                  // 上边缘所在行
-                    g_ty_last  <= div5(y + TANK_H - 1);     // 下边缘所在行
+                    // 【只除 2 次】其余 6 个边界值由 col0/row0 加常数得到（见上面的说明）
+                    g_tx_first <= col0;                     // 左边缘所在列
+                    g_tx_last  <= col0 + COL_LAST;          // 右边缘所在列
+                    g_ty_first <= row0;                     // 上边缘所在行
+                    g_ty_last  <= row0 + ROW_LAST;          // 下边缘所在行
                     // 前进方向上“新进入”的那一行/列
                     g_front_up    <= (y == 10'd0) ? 8'd0
-                                   : div5(y - 10'd1);
+                                   : (row0 - 8'd1);
                     g_front_down  <= (y + TANK_H >= MAP_H * TILE) ? (MAP_H - 1)
-                                   : div5(y + TANK_H);
+                                   : (row0 + ROW_NEXT);
                     g_front_left  <= (x == 10'd0) ? 8'd0
-                                   : div5(x - 10'd1);
+                                   : (col0 - 8'd1);
                     g_front_right <= (x + TANK_W >= MAP_W * TILE) ? (MAP_W - 1)
-                                   : div5(x + TANK_W);
+                                   : (col0 + COL_NEXT);
                     scan_phase <= 3'd0;
                     scan_state <= S_SCAN;
                 end

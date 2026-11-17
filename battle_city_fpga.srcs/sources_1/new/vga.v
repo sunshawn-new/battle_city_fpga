@@ -1,44 +1,36 @@
 `timescale 1ns / 1ps
 
 module vga #(
-    parameter N_B = 4,            // 炮弹对象池深度（和 bullet_ctrl 的 N_B 保持一致）
-    parameter N_E = 3,            // 敌方坦克辆数（和 enemy_ctrl 的 N_E 保持一致）
-    parameter N_FX = 4            // 爆炸槽数（和 fx_ctrl 的 N_FX 保持一致）
+    parameter N_B = 4,
+    parameter N_E = 3,
+    parameter N_FX = 4
 )(
     input clock,                  // 100MHz
     input reset,
     input [9:0] position_x,       // 修复位宽
     input [9:0] position_y,
-    // 1 = 这一帧不画玩家坦克（复活无敌时的闪烁，见 top.v 的 player_blink）
-    input       player_hide,
+    input       player_hide,  // 1表示这一帧不画玩家坦克
     input wire [3:0] tile_id,
     input wire [1:0] player_direction,
-    // 炮弹图层：每个槽 10 位坐标 + 2 位朝向，扁平打包（避免 unpacked array 端口）
     input wire [N_B-1:0]    bullet_valid,
     input wire [N_B*10-1:0] bullet_x,
     input wire [N_B*10-1:0] bullet_y,
     input wire [N_B*2-1:0]  bullet_dir,
-    // 敌方坦克图层：和炮弹一样扁平打包（第 i 辆占 x[i*10 +: 10] / dir[i*2 +: 2]）
     input wire [N_E-1:0]    enemy_valid,
     input wire [N_E*10-1:0] enemy_x,
     input wire [N_E*10-1:0] enemy_y,
     input wire [N_E*2-1:0]  enemy_dir,
-    // 兵种：第 i 辆占 enemy_type[i*2 +: 2]（00 快速 / 01 火力 / 10 装甲）
     input wire [N_E*2-1:0]  enemy_type,
-    // 炮弹归属：第 i 位 1 = 这发是敌人打的（画成偏品红，和玩家的白弹区分）
     input wire [N_B-1:0]    bullet_owner,
-    // 爆炸图层：和炮弹/敌人一样扁平打包（第 i 个槽占 x[i*10 +: 10] / frame[i*2 +: 2]）
     input wire [N_FX-1:0]    fx_valid,
     input wire [N_FX*10-1:0] fx_x,
     input wire [N_FX*10-1:0] fx_y,
-    input wire [N_FX*2-1:0]  fx_frame,   // 0 = 亮爆团，1 = 星形环
-    // 基地状态：1 = 已被炮弹打爆（基地图层换成“白旗”贴图）
-    input wire              hq_destroyed,
-    // ---------------- HUD（右侧 200px 信息栏，见 hud.v）----------------
+    input wire [N_FX*2-1:0]  fx_frame,   // 0亮爆团，1星形环
+    input wire              hq_destroyed, // 基地状态，1表示已被炮弹打爆
     input wire [3:0]        hud_score100,
     input wire [2:0]        hud_lives,
     input wire [2:0]        hud_level,
-    input wire [5:0]        hud_enemy_left,  // 本关剩余敌人（HUD 显示 ENEMY nn）
+    input wire [5:0]        hud_enemy_left,
     input wire              hud_game_over,
     input wire              hud_victory,
     output wire vga_clk,
@@ -47,10 +39,8 @@ module vga #(
     output wire vsync,
     output wire [14:0] map_addr
 );
-    // 组合逻辑里 assign 出来的中间信号，显式声明（原来靠隐式网线，综合有警告）
     wire dat_act, hsync_raw, vsync_raw;
 
-    // 800x600 @ 60Hz 的参数（画面尺寸没变；左边 600px 是玩区，右边 200px 是 HUD）
     localparam [10:0] H_SYNC_END  = 11'd119,
                       H_DAT_BEGIN = 11'd184,
                       H_DAT_END   = 11'd984,
@@ -63,7 +53,6 @@ module vga #(
     reg [10:0] hcount = 11'd0;
     reg [10:0] vcount = 11'd0;
     
-    // 分频：100MHz -> 50MHz 像素时钟
     reg clk_50m_reg = 1'b0;
     always @(posedge clock) begin
         if(reset) clk_50m_reg <= 1'b0;
@@ -72,7 +61,6 @@ module vga #(
 
     assign vga_clk = clk_50m_reg;
 
-    // 行/场扫描 (基于 50MHz)
     always @(posedge vga_clk) begin
         if (hcount == H_PIXEL_END) hcount <= 11'd0;
         else                       hcount <= hcount + 11'd1;
@@ -90,7 +78,6 @@ module vga #(
     assign hsync_raw = (hcount <= H_SYNC_END);
     assign vsync_raw = (vcount <= V_SYNC_END);
 
-    // 坐标转换
     wire [10:0] img_x = hcount - H_DAT_BEGIN;   // 0..799
     wire [10:0] img_y = vcount - V_DAT_BEGIN;   // 0..599
 

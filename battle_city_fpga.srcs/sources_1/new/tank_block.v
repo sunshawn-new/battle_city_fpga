@@ -33,12 +33,20 @@
 //    这个判定纯组合、每个移动节拍才用一次，根本不需要 DSP；
 //    关掉吸收后它老老实实留在 LUT 里（3~4 级），WNS 就回去了。
 //    注意：只关这一个模块，div5（地图坐标 /5）该用 DSP 还是用 DSP。
+//
+//  【“|dx| < 20”用位测试，不再用比较器】（第二轮优化）
+//    坐标恒为 TILE=5 的整数倍 → |dx| 只可能是 0/5/10/15/20/…，
+//    所以 |dx| < 16 就等于 |dx| < 20。把 11 位比较器换成“高 7 位全 0”
+//    的位测试：每个比较器少 3 级进位链、省约 10 个 LUT。
+//    这里是最差时序路径（enemy 的 y_reg → can_go → 决策寄存器）的源头，
+//    改完后的 slack 见 sim/build_report.txt（11 级 → 更少，WNS 明显变大）。
 // ============================================================================
 (* use_dsp = "no" *)
 module tank_block #(
     parameter N      = 3,      // 参与比较的“别的车”数量
     parameter TANK_W = 20,     // 车身宽（像素）
-    parameter TANK_H = 20
+    parameter TANK_H = 20,
+    parameter TILE   = 5       // 一格像素：所有坦克坐标都是它的整数倍
 )(
     input  [9:0]      cx,      // 本车想去的左上角（像素）
     input  [9:0]      cy,
@@ -50,20 +58,57 @@ module tank_block #(
     localparam [10:0] W11 = TANK_W;
     localparam [10:0] H11 = TANK_H;
 
+    // ================= “|d| < 车宽”的最省写法 =================
+    // 所有坦克坐标恒为 TILE 的整数倍（player / enemy_ctrl 都是整格移动），
+    // 所以 |d| 只可能是 0、5、10、15、20、…
+    // 于是 |d| < 2^HI（HI = floor(log2(TANK_W)) = 4，即 16）就等价于 |d| < 20：
+    //   16 落在 (TANK_W-TILE, TANK_W] 这个区间里，中间没有任何“可行值”。
+    //   老写法：11 位比较器        → 3 级 CARRY4 + 比较逻辑
+    //   新写法：高 7 位全 0 的位测试 → 1 个 LUT6（NOR），没有进位链
+    // 参数保护：只有 TANK_W 是 TILE 的整数倍、且 2^HI > TANK_W-TILE 时才用位测试，
+    // 否则自动退回普通比较器 —— 以后改车身尺寸/格子大小不会被这个技巧坑到。
+    function integer flog2;        // floor(log2(v))
+        input integer v;
+        integer i;
+        begin
+            flog2 = 0;
+            for (i = 0; i < 31; i = i + 1)
+                if ((1 << i) <= v) flog2 = i;
+        end
+    endfunction
+
+    localparam HI      = flog2(TANK_W);                  // 20 -> 4
+    localparam [10:0] THR = 11'd1 << HI;                 // 16
+    localparam USE_BIT = (TANK_W % TILE == 0) && (THR > (TANK_W - TILE));
+
     // 无符号绝对差：先比大小再减，避免 10 位相减回绕成一个大数
     wire [N-1:0] hit;
 
     genvar gi;
     generate
-        for (gi = 0; gi < N; gi = gi + 1) begin : g_cmp
-            wire [9:0] ox = o_x[gi*10 +: 10];
-            wire [9:0] oy = o_y[gi*10 +: 10];
-            wire [10:0] dx = (cx > ox) ? ({1'b0, cx} - {1'b0, ox})
-                                       : ({1'b0, ox} - {1'b0, cx});
-            wire [10:0] dy = (cy > oy) ? ({1'b0, cy} - {1'b0, oy})
-                                       : ({1'b0, oy} - {1'b0, cy});
-
-            assign hit[gi] = o_valid[gi] && (dx < W11) && (dy < H11);
+        if (USE_BIT) begin : g_fast
+            for (gi = 0; gi < N; gi = gi + 1) begin : g_cmp
+                wire [9:0]  ox = o_x[gi*10 +: 10];
+                wire [9:0]  oy = o_y[gi*10 +: 10];
+                wire [10:0] dx = (cx > ox) ? ({1'b0, cx} - {1'b0, ox})
+                                           : ({1'b0, ox} - {1'b0, cx});
+                wire [10:0] dy = (cy > oy) ? ({1'b0, cy} - {1'b0, oy})
+                                           : ({1'b0, oy} - {1'b0, cy});
+                // 高位全 0 = 距离 < 16 = 距离 < 20（只可能是 0/5/10/15）
+                assign hit[gi] = o_valid[gi] &&
+                                 (dx[10:HI] == {(11-HI){1'b0}}) &&
+                                 (dy[10:HI] == {(11-HI){1'b0}});
+            end
+        end else begin : g_cmp_generic
+            for (gi = 0; gi < N; gi = gi + 1) begin : g_cmp
+                wire [9:0]  ox = o_x[gi*10 +: 10];
+                wire [9:0]  oy = o_y[gi*10 +: 10];
+                wire [10:0] dx = (cx > ox) ? ({1'b0, cx} - {1'b0, ox})
+                                           : ({1'b0, ox} - {1'b0, cx});
+                wire [10:0] dy = (cy > oy) ? ({1'b0, cy} - {1'b0, oy})
+                                           : ({1'b0, oy} - {1'b0, cy});
+                assign hit[gi] = o_valid[gi] && (dx < W11) && (dy < H11);
+            end
         end
     endgenerate
 
